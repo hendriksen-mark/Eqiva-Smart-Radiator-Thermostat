@@ -693,8 +693,9 @@ class Alias():
             if os.path.isfile(filename):
                 with open(filename, "r") as ins:
                     for line in ins:
+                        line = re.sub(r"\s*#.*", "", line) # Remove comments marked with #
                         _m = re.match(
-                            "([0-9A-Fa-f:]+) +(.*)$", line)
+                            r"([0-9A-Fa-f:]+)\s+(.*)$", line)
                         if _m and (_m.groups()[0].upper().startswith(Thermostat.MAC_PREFIX) or _m.groups()[0].upper().endswith(Thermostat.MAC_PREFIX)):
                             self.aliases[_m.groups()[0]] = _m.groups()[1]
 
