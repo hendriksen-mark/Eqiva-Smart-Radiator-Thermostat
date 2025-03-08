@@ -127,7 +127,7 @@ class Event():
     def to_dict(self) -> dict:
 
         return {
-            "temparature": self.temperature.to_dict(),
+            "temperature": self.temperature.to_dict(),
             "until": f"{self.hour:02}:{self.minute:02}"
         }
 
@@ -1314,7 +1314,7 @@ USAGE:   eqiva.py <mac_1/alias_1> [<mac_2/alias_2>] ... --<command_1> [<param_1>
             if thermostat.mode and not command_style:
                 s.append("  Modes:               %s" %
                          mode_to_human_readable(thermostat.mode))
-                s.append("  Temparature:         %s" %
+                s.append("  Temperature:         %s" %
                          temp_to_human_readable(thermostat.temperature))
                 s.append("  Vacation:            %s" % vacation_to_human_readable(
                     thermostat.vacation, temperature=thermostat.temperature))

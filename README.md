@@ -118,7 +118,7 @@ $ ./eqiva.py 00:1A:22:XX:XX:XX --status --print
 
 Thermostat 00:1A:22:XX:XX:XX
   Modes:               auto, vacation, daylight summer time
-  Temparature:         18.5°C (65.3°F)
+  Temperature:         18.5°C (65.3°F)
   Vacation:            until 2024-11-24 10:00
   Valve:               0%
 
@@ -188,7 +188,7 @@ $ ./eqiva.py Wohnz --status --print
 Thermostat 00:1A:22:XX:XX:XX
 
   Modes:               manual, daylight summer time
-  Temparature:         16.5°C (61.7°F)
+  Temperature:         16.5°C (61.7°F)
   Vacation:            off
   Valve:               0%
 
@@ -208,7 +208,7 @@ Thermostat 00:1A:22:XX:XX:XX
   Vendor:              eq-3
   Serial no.:          OEQ06XXXXX
   Modes:               manual, daylight summer time
-  Temparature:         16.5°C (61.7°F)
+  Temperature:         16.5°C (61.7°F)
   Vacation:            off
   Valve:               0%
 
@@ -377,7 +377,7 @@ Thermostat 00:1A:22:XX:XX:XX
   Vendor:              eq-3
   Serial no.:          OEQ06XXXXX
   Modes:               manual, daylight summer time
-  Temparature:         20.0°C (68.0°F)
+  Temperature:         20.0°C (68.0°F)
   Vacation:            off
   Valve:               77%
 
@@ -466,21 +466,21 @@ $ ./eqiva.py Wohnz --dump --json
     "program": {
       "sat": [
         {
-          "temparature": {
+          "temperature": {
             "valueC": 17.5,
             "valueF": 63.5
           },
           "until": "08:00"
         },
         {
-          "temparature": {
+          "temperature": {
             "valueC": 20.5,
             "valueF": 68.9
           },
           "until": "22:00"
         },
         {
-          "temparature": {
+          "temperature": {
             "valueC": 17.5,
             "valueF": 63.5
           },
@@ -489,21 +489,21 @@ $ ./eqiva.py Wohnz --dump --json
       ],
       "sun": [
         {
-          "temparature": {
+          "temperature": {
             "valueC": 17.5,
             "valueF": 63.5
           },
           "until": "08:00"
         },
         {
-          "temparature": {
+          "temperature": {
             "valueC": 20.5,
             "valueF": 68.9
           },
           "until": "21:00"
         },
         {
-          "temparature": {
+          "temperature": {
             "valueC": 17.5,
             "valueF": 63.5
           },
@@ -512,21 +512,21 @@ $ ./eqiva.py Wohnz --dump --json
       ],
       "mon": [
         {
-          "temparature": {
+          "temperature": {
             "valueC": 17.5,
             "valueF": 63.5
           },
           "until": "07:00"
         },
         {
-          "temparature": {
+          "temperature": {
             "valueC": 20.5,
             "valueF": 68.9
           },
           "until": "21:00"
         },
         {
-          "temparature": {
+          "temperature": {
             "valueC": 17.5,
             "valueF": 63.5
           },
@@ -535,21 +535,21 @@ $ ./eqiva.py Wohnz --dump --json
       ],
       "tue": [
         {
-          "temparature": {
+          "temperature": {
             "valueC": 17.5,
             "valueF": 63.5
           },
           "until": "07:00"
         },
         {
-          "temparature": {
+          "temperature": {
             "valueC": 20.5,
             "valueF": 68.9
           },
           "until": "21:00"
         },
         {
-          "temparature": {
+          "temperature": {
             "valueC": 17.5,
             "valueF": 63.5
           },
@@ -558,21 +558,21 @@ $ ./eqiva.py Wohnz --dump --json
       ],
       "wed": [
         {
-          "temparature": {
+          "temperature": {
             "valueC": 17.5,
             "valueF": 63.5
           },
           "until": "17:00"
         },
         {
-          "temparature": {
+          "temperature": {
             "valueC": 20.5,
             "valueF": 68.9
           },
           "until": "21:00"
         },
         {
-          "temparature": {
+          "temperature": {
             "valueC": 17.5,
             "valueF": 63.5
           },
@@ -581,21 +581,21 @@ $ ./eqiva.py Wohnz --dump --json
       ],
       "thu": [
         {
-          "temparature": {
+          "temperature": {
             "valueC": 17.5,
             "valueF": 63.5
           },
           "until": "07:00"
         },
         {
-          "temparature": {
+          "temperature": {
             "valueC": 20.5,
             "valueF": 68.9
           },
           "until": "21:00"
         },
         {
-          "temparature": {
+          "temperature": {
             "valueC": 17.5,
             "valueF": 63.5
           },
