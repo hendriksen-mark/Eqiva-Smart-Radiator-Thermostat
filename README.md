@@ -142,7 +142,12 @@ $ ./eqiva.py Wohnz --status --print
 ...
 ```
 
-Note, that I have just written ```Wohnz``` instead of the full name. The alias is like a pattern. Every line that matches in ```.known_eqivas``` will be connected.
+Note, that I have just written ```Wohnz``` instead of the full name. The alias is like a pattern. Every line that matches in ```.known_eqivas``` will be connected. The format of the lines is the following:
+
+```
+11:22:33:44:55:66[SPACES]+Name # Optional comment
+```
+
 
 ## Multiple devices and command queueing
 Connections to multiple devices are supported although I recommend connecting just to a single device. In addition, you can send multiple commands by queueing these commands.
