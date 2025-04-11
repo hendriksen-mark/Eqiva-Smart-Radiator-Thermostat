@@ -70,7 +70,8 @@ class Temperature:
     def __init__(self, valueC: float = None):
 
         if valueC != None and (valueC < -4.5 or valueC > 30.0 or valueC * 10 % 5 != 0):
-            raise EqivaException(message='valueC must be between -4.5 and 30.0 in steps of 0.5. Offset temperature can be between -4.5 and 4.5. All other temperatures must be between 4.5 and 30.0')
+            raise EqivaException(
+                message='valueC must be between -4.5 and 30.0 in steps of 0.5. Offset temperature can be between -4.5 and 4.5. All other temperatures must be between 4.5 and 30.0')
 
         self.valueC: float = valueC
 
@@ -106,7 +107,8 @@ class Event():
     def __init__(self, temperature: Temperature = None, hour: int = 0, minute: int = 0):
 
         if hour < 0 or hour > 24 or minute < 0 or minute > 50 or minute % 10 != 0:
-            raise EqivaException('hour must be between 0 and 24. minute must be between 0 and 50 in steps of 10')
+            raise EqivaException(
+                'hour must be between 0 and 24. minute must be between 0 and 50 in steps of 10')
 
         self.hour = hour
         self.minute = minute
@@ -162,7 +164,8 @@ class Program():
         if not events:
             raise EqivaException('No events given')
         elif len(events) > 7:
-            raise EqivaException('More than 7 events given but maximum is 7 events per day')
+            raise EqivaException(
+                'More than 7 events given but maximum is 7 events per day')
 
         self.events: 'list[Event]' = events
 
@@ -231,7 +234,8 @@ class OpenWindowConfig():
     def __init__(self, temperature: Temperature = None, minutes: int = 0):
 
         if minutes < 0 or minutes > 995 or minutes % 5 != 0:
-            raise EqivaException(message='minutes must be between 5 and 995 in steps of 5')
+            raise EqivaException(
+                message='minutes must be between 5 and 995 in steps of 5')
 
         self.minutes: int = minutes
         self.temperature: Temperature = temperature
@@ -393,11 +397,25 @@ class Thermostat(BleakClient, Listener):
             self.mode = Mode(mode=bytes[2])
             self.valve = bytes[3]
             self.temperature = Temperature.fromByte(bytes[5])
-            self.vacation = Vacation.fromBytes(bytes[6:10])
-            self.openWindowConfig = OpenWindowConfig.fromBytes(bytes[10:12])
-            self.comfortTemperature = Temperature.fromByte(bytes[12])
-            self.ecoTemperature = Temperature.fromByte(bytes[13])
-            self.offsetTemperature = Temperature.fromByte(bytes[14] - 7)
+            if len(bytes) > 9:
+                self.vacation = Vacation.fromBytes(bytes[6:10])
+            else:
+                self.vacation = None
+
+            if len(bytes) == 15:
+                self.openWindowConfig = OpenWindowConfig.fromBytes(
+                    bytes[10:12])
+                self.comfortTemperature = Temperature.fromByte(bytes[12])
+                self.ecoTemperature = Temperature.fromByte(bytes[13])
+                self.offsetTemperature = Temperature.fromByte(bytes[14] - 7)
+            else:
+                self.openWindowConfig = None
+                self.comfortTemperature = None
+                self.ecoTemperature = None
+                self.offsetTemperature = None
+                LOGGER.debug(
+                    f"{device.address}: outdated firmware detected.")
+
             LOGGER.info(f"{device.address}: received status: mode={str(self.mode)}, temperature={str(self.temperature)}, valve={str(self.valve)}%, vacation={str(self.vacation)}, openWindowConfig="
                         f"{str(self.openWindowConfig)}, comfortTemperature={str(self.comfortTemperature)}, ecoTemperature={str(self.ecoTemperature)}, offsetTemperature={str(self.offsetTemperature)}")
 
@@ -693,7 +711,8 @@ class Alias():
             if os.path.isfile(filename):
                 with open(filename, "r") as ins:
                     for line in ins:
-                        line = re.sub(r"\s*#.*", "", line) # Remove comments marked with #
+                        # Remove comments marked with #
+                        line = re.sub(r"\s*#.*", "", line)
                         _m = re.match(
                             r"([0-9A-Fa-f:]+)\s+(.*)$", line)
                         if _m and (_m.groups()[0].upper().startswith(Thermostat.MAC_PREFIX) or _m.groups()[0].upper().endswith(Thermostat.MAC_PREFIX)):
@@ -1258,6 +1277,9 @@ USAGE:   eqiva.py <mac_1/alias_1> [<mac_2/alias_2>] ... --<command_1> [<param_1>
 
         def temp_to_human_readable(temp: Temperature) -> str:
 
+            if not temp:
+                return "n/a"
+
             if command_style:
                 return f"{temp.valueC:.1f}"
 
@@ -1266,7 +1288,7 @@ USAGE:   eqiva.py <mac_1/alias_1> [<mac_2/alias_2>] ... --<command_1> [<param_1>
 
         def vacation_to_human_readable(vacation: Vacation, temperature: Temperature) -> str:
 
-            if vacation.until:
+            if vacation and vacation.until:
                 if command_style:
                     return "%s %s" % (vacation.until.strftime("%Y-%m-%d %H:%M"), temp_to_human_readable(temperature))
                 else:
@@ -1275,6 +1297,9 @@ USAGE:   eqiva.py <mac_1/alias_1> [<mac_2/alias_2>] ... --<command_1> [<param_1>
                 return "" if command_style else "off"
 
         def openwindow_to_human_readable(openwindowconfig: OpenWindowConfig) -> str:
+
+            if not openwindowconfig:
+                return "n/a"
 
             if command_style:
                 return f"{temp_to_human_readable(openwindowconfig.temperature)} {openwindowconfig.minutes}"
