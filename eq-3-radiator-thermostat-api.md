@@ -1,4 +1,4 @@
-0411 0# eQ-3 radiator thermostat API
+# eQ-3 radiator thermostat API
 
 ## Device Information
 
