@@ -18,6 +18,13 @@ if ! command -v pip3 &>/dev/null; then
     sudo apt-get install -y python3-pip
 fi
 
+# Check for uxterm
+if ! command -v uxterm &>/dev/null; then
+    echo "uxterm is not installed. Installing uxterm..."
+    sudo apt-get update
+    sudo apt-get install -y xterm
+fi
+
 # Optional: create and activate a virtual environment
 if [ ! -d "venv" ]; then
     echo "Creating Python virtual environment..."
@@ -45,7 +52,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=$(pwd)
-ExecStart=$(pwd)/venv/bin/python3 $(pwd)/api.py
+ExecStart=/usr/bin/uxterm -hold -e $(pwd)/venv/bin/python3 $(pwd)/api.py
 Restart=always
 User=$(whoami)
 Environment=PYTHONUNBUFFERED=1
