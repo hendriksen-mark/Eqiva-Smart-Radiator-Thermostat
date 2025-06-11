@@ -5,6 +5,22 @@ set -e
 
 echo "== Eqiva Smart Radiator Thermostat Project Installer =="
 
+# Check for git
+if ! command -v git &>/dev/null; then
+    echo "git is not installed. Installing git..."
+    sudo apt-get update
+    sudo apt-get install -y git
+fi
+
+# Clone repo if not present
+REPO_URL="https://github.com/hendriksen-mark/Eqiva-Smart-Radiator-Thermostat.git"
+REPO_DIR="Eqiva-Smart-Radiator-Thermostat"
+if [ ! -f "requirements.txt" ] && [ ! -d ".git" ]; then
+    echo "Cloning repository..."
+    git clone "$REPO_URL" "$REPO_DIR"
+    cd "$REPO_DIR"
+fi
+
 # Check for Python 3
 if ! command -v python3 &>/dev/null; then
     echo "Python 3 is not installed. Please install Python 3 and rerun this script."
@@ -72,3 +88,5 @@ fi
 echo "== Installation complete =="
 echo "To activate the virtual environment in the future, run:"
 echo "  source venv/bin/activate"
+echo "To update this project in the future, run:"
+echo "  git pull"
