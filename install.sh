@@ -1,4 +1,5 @@
 #!/bin/bash
+#curl -fsSL https://raw.githubusercontent.com/hendriksen-mark/Eqiva-Smart-Radiator-Thermostat/main/install.sh | bash
 
 set -e
 
