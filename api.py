@@ -1,0 +1,184 @@
+import logging
+from flask import Flask, request, jsonify
+import asyncio
+import threading
+import time
+from eqiva import Thermostat, Temperature, EqivaException
+import yaml
+import os
+from bleak.exc import BleakDeviceNotFoundError  # <-- Add this import
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(filename)s:%(lineno)d %(message)s"
+)
+
+app = Flask(__name__)
+
+STATUS_YAML_PATH = os.path.join(os.path.dirname(__file__), "status_store.yaml")
+
+# Store latest status per MAC
+status_store = {}
+
+def format_mac(mac):
+    return mac.replace('-', ':').upper()
+
+def load_status_store():
+    global status_store
+    if os.path.exists(STATUS_YAML_PATH):
+        with open(STATUS_YAML_PATH, "r") as f:
+            data = yaml.safe_load(f)
+            if isinstance(data, dict):
+                status_store = data
+
+def save_status_store():
+    with open(STATUS_YAML_PATH, "w") as f:
+        yaml.safe_dump(status_store, f)
+
+async def poll_status(mac):
+    thermostat = Thermostat(mac)
+    try:
+        await thermostat.connect()
+        await thermostat.requestStatus()
+        mode = thermostat.mode
+        valve = thermostat.valve
+        temp = thermostat.temperature.valueC
+
+        # Map modes to PHP logic
+        if mode == 'off':
+            mode_status = 0
+        elif valve and valve > 0:
+            mode_status = 1
+        elif valve == 0:
+            mode_status = 2
+        else:
+            mode_status = 3 if mode == 'auto' else 1
+
+        status_store[mac] = {
+            "targetHeatingCoolingState": 3 if mode == 'auto' else (1 if mode == 'manual' else 0),
+            "targetTemperature": temp,
+            "currentHeatingCoolingState": mode_status,
+            "currentTemperature": temp
+        }
+    except BleakDeviceNotFoundError:
+        # Device not found, do not update status_store
+        raise
+    except EqivaException:
+        # Do not update status_store on error
+        pass
+    finally:
+        try:
+            await thermostat.disconnect()
+        except Exception:
+            pass
+
+def polling_loop():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    while True:
+        macs_to_poll = list(status_store.keys())
+        tasks = [poll_status(mac) for mac in macs_to_poll]
+        loop.run_until_complete(asyncio.gather(*tasks))
+        save_status_store()
+        time.sleep(30)  # Poll every 30 seconds
+
+def start_polling():
+    load_status_store()
+    t = threading.Thread(target=polling_loop, daemon=True)
+    t.start()
+
+@app.route('/<mac>/<request_type>', defaults={'value': None}, methods=['GET'])
+@app.route('/<mac>/<request_type>/<value>', methods=['GET'])
+def handle(mac, request_type, value):
+    mac = format_mac(mac)
+    # Support value from query string if not present in path
+    if value is None:
+        value = request.args.get("value")
+    logging.info(f"Received request: mac={mac}, request_type={request_type}, value={value}")
+    if request_type == 'status':
+        if mac not in status_store:
+            # Add unknown MAC to status_store with default values and return immediately
+            status_store[mac] = {
+                "targetHeatingCoolingState": 0,
+                "targetTemperature": 20.0,
+                "currentHeatingCoolingState": 0,
+                "currentTemperature": 20.0
+            }
+            save_status_store()
+            logging.info(f"MAC {mac} not found, returning default values.")
+            return jsonify(status_store[mac])
+        if mac in status_store:
+            return jsonify(status_store[mac])
+        else:
+            logging.error(f"No status available for MAC {mac}")
+            return jsonify({"error": "No status available"}), 404
+    elif request_type == 'targetTemperature' and value:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            result = loop.run_until_complete(set_temperature(mac, value))
+        except BleakDeviceNotFoundError:
+            logging.error(f"Device with address {mac} was not found")
+            return jsonify({"result": "error", "message": f"Device with address {mac} was not found"}), 404
+        logging.info(f"Set targetTemperature for {mac} to {value}: {result}")
+        return jsonify(result)
+    elif request_type == 'targetHeatingCoolingState' and value:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            result = loop.run_until_complete(set_mode(mac, value))
+        except BleakDeviceNotFoundError:
+            logging.error(f"Device with address {mac} was not found")
+            return jsonify({"result": "error", "message": f"Device with address {mac} was not found"}), 404
+        logging.info(f"Set targetHeatingCoolingState for {mac} to {value}: {result}")
+        return jsonify(result)
+    else:
+        logging.error(f"Invalid request: mac={mac}, request_type={request_type}, value={value}")
+        return jsonify({"error": "Invalid request"}), 400
+
+async def set_temperature(mac, temp):
+    thermostat = Thermostat(mac)
+    try:
+        await thermostat.connect()
+        await thermostat.setTemperature(temperature=Temperature(valueC=float(temp)))
+        logging.info(f"Set temperature for {mac} to {temp}")
+        return {"result": "ok"}
+    except BleakDeviceNotFoundError:
+        logging.error(f"Device with address {mac} was not found")
+        return {"result": "error", "message": f"Device with address {mac} was not found"}
+    except EqivaException as ex:
+        logging.error(f"EqivaException for {mac}: {str(ex)}")
+        return {"result": "error", "message": str(ex)}
+    finally:
+        try:
+            await thermostat.disconnect()
+        except Exception as e:
+            logging.error(f"Error disconnecting from {mac}: {e}")
+
+async def set_mode(mac, mode):
+    thermostat = Thermostat(mac)
+    try:
+        await thermostat.connect()
+        if mode == '0':
+            await thermostat.setTemperatureOff()
+        elif mode in ('1', '2'):
+            await thermostat.setModeManual()
+        elif mode == '3':
+            await thermostat.setModeAuto()
+        logging.info(f"Set mode for {mac} to {mode}")
+        return {"result": "ok"}
+    except BleakDeviceNotFoundError:
+        logging.error(f"Device with address {mac} was not found")
+        return {"result": "error", "message": f"Device with address {mac} was not found"}
+    except EqivaException as ex:
+        logging.error(f"EqivaException for {mac}: {str(ex)}")
+        return {"result": "error", "message": str(ex)}
+    finally:
+        try:
+            await thermostat.disconnect()
+        except Exception as e:
+            logging.error(f"Error disconnecting from {mac}: {e}")
+
+if __name__ == '__main__':
+    start_polling()
+    app.run(host='0.0.0.0', port=5001)
