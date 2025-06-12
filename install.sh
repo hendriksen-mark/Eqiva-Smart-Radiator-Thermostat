@@ -71,7 +71,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=$(pwd)
-ExecStart=/usr/bin/uxterm -hold -e $(pwd)/venv/bin/python3 $(pwd)/api.py
+ExecStart=/usr/bin/lxterm -e $(pwd)/venv/bin/python3 $(pwd)/api.py
 Restart=always
 User=$(whoami)
 Environment=PYTHONUNBUFFERED=1
