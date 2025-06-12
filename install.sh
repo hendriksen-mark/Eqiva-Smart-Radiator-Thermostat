@@ -3,6 +3,8 @@
 
 set -e
 
+cd ~
+
 echo "== Eqiva Smart Radiator Thermostat Project Installer =="
 
 # Check for git
@@ -15,11 +17,12 @@ fi
 # Clone repo if not present
 REPO_URL="https://github.com/hendriksen-mark/Eqiva-Smart-Radiator-Thermostat.git"
 REPO_DIR="Eqiva-Smart-Radiator-Thermostat"
-if [ ! -f "requirements.txt" ] && [ ! -d ".git" ]; then
+if [ ! -d "$REPO_DIR" ]; then
     echo "Cloning repository..."
     git clone "$REPO_URL" "$REPO_DIR"
-    cd "$REPO_DIR"
 fi
+
+cd "$REPO_DIR"
 
 # Check for Python 3
 if ! command -v python3 &>/dev/null; then
