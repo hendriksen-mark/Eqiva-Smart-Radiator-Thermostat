@@ -57,7 +57,7 @@ pip install --upgrade pip
 
 # Install requirements
 echo "Installing Python dependencies..."
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 
 # Create systemd service for API
 SERVICE_FILE="/etc/systemd/system/eqiva-api.service"
@@ -71,7 +71,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=$(pwd)
-ExecStart=/usr/bin/lxterm -e $(pwd)/venv/bin/python3 $(pwd)/api.py
+ExecStart=$(pwd)/venv/bin/python3 $(pwd)/api.py
 Restart=always
 User=$(whoami)
 Environment=PYTHONUNBUFFERED=1
