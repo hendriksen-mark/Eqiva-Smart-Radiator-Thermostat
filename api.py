@@ -143,9 +143,9 @@ def handle(mac: str, request_type: str, value: Optional[str]) -> Any:
 async def set_temperature(mac: str, temp: str) -> Dict[str, Any]:
     thermostat = Thermostat(mac)
     try:
+        logging.info(f"Set temperature for {mac} to {temp}")
         await thermostat.connect()
         await thermostat.setTemperature(temperature=Temperature(valueC=float(temp)))
-        logging.info(f"Set temperature for {mac} to {temp}")
         return {"result": "ok"}
     except BleakError:
         logging.error(f"Device with address {mac} was not found")
