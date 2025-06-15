@@ -95,3 +95,9 @@ if __name__ == '__main__':
         asyncio.run(do_stuff1())
     except Exception as e:
         print(f"Error: {e}")
+        if hasattr(e, 'args') and e.args:
+            print(f"Details: {e.args[0]}")
+        print("Hint: [org.bluez.Error.Failed] le-connection-abort-by-local usually means:")
+        print("- The device is already connected elsewhere or busy.")
+        print("- Bluetooth is not ready or the device is out of range.")
+        print("- Try power cycling the thermostat, disabling/enabling Bluetooth, or rebooting the Pi.")
