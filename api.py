@@ -6,7 +6,7 @@ import time
 from eqiva import Thermostat, Temperature, EqivaException
 import yaml
 import os
-from bleak.exc import BleakDeviceNotFoundError  # <-- Add this import
+from bleak import BleakError  # <-- Use this instead
 from typing import Dict, Any, Optional
 
 logging.basicConfig(
@@ -61,8 +61,8 @@ async def poll_status(mac: str) -> None:
             "currentHeatingCoolingState": mode_status,
             "currentTemperature": temp
         }
-    except BleakDeviceNotFoundError:
-        # Device not found, do not update status_store
+    except BleakError:
+        # Device not found or BLE error, do not update status_store
         raise
     except EqivaException:
         # Do not update status_store on error
@@ -121,7 +121,7 @@ def handle(mac: str, request_type: str, value: Optional[str]) -> Any:
         asyncio.set_event_loop(loop)
         try:
             result = loop.run_until_complete(set_temperature(mac, value))
-        except BleakDeviceNotFoundError:
+        except BleakError:
             logging.error(f"Device with address {mac} was not found")
             return jsonify({"result": "error", "message": f"Device with address {mac} was not found"}), 404
         logging.info(f"Set targetTemperature for {mac} to {value}: {result}")
@@ -131,7 +131,7 @@ def handle(mac: str, request_type: str, value: Optional[str]) -> Any:
         asyncio.set_event_loop(loop)
         try:
             result = loop.run_until_complete(set_mode(mac, value))
-        except BleakDeviceNotFoundError:
+        except BleakError:
             logging.error(f"Device with address {mac} was not found")
             return jsonify({"result": "error", "message": f"Device with address {mac} was not found"}), 404
         logging.info(f"Set targetHeatingCoolingState for {mac} to {value}: {result}")
@@ -147,7 +147,7 @@ async def set_temperature(mac: str, temp: str) -> Dict[str, Any]:
         await thermostat.setTemperature(temperature=Temperature(valueC=float(temp)))
         logging.info(f"Set temperature for {mac} to {temp}")
         return {"result": "ok"}
-    except BleakDeviceNotFoundError:
+    except BleakError:
         logging.error(f"Device with address {mac} was not found")
         return {"result": "error", "message": f"Device with address {mac} was not found"}
     except EqivaException as ex:
@@ -171,7 +171,7 @@ async def set_mode(mac: str, mode: str) -> Dict[str, Any]:
             await thermostat.setModeAuto()
         logging.info(f"Set mode for {mac} to {mode}")
         return {"result": "ok"}
-    except BleakDeviceNotFoundError:
+    except BleakError:
         logging.error(f"Device with address {mac} was not found")
         return {"result": "error", "message": f"Device with address {mac} was not found"}
     except EqivaException as ex:
