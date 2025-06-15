@@ -91,5 +91,7 @@ async def do_stuff1() -> None:
 
 
 if __name__ == '__main__':
-
-    asyncio.run(do_stuff1())
+    try:
+        asyncio.run(do_stuff1())
+    except Exception as e:
+        print(f"Error: {e}")
