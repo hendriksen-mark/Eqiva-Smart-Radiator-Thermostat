@@ -41,11 +41,13 @@ def save_status_store() -> None:
         yaml.safe_dump(status_store, f)
 
 async def poll_status(mac: str) -> None:
-    logging.info(f"Polling: Attempting to connect to {mac}")  # <-- Add this line for visibility
+    logging.info(f"Polling: Attempting to connect to {mac}")
     thermostat = Thermostat(mac)
     try:
         await thermostat.connect()
+        logging.info(f"Polling: Connected to {mac}")  # <-- Add this line
         await thermostat.requestStatus()
+        logging.info(f"Polling: Status requested from {mac}")  # <-- Add this line
         mode = thermostat.mode
         valve = thermostat.valve
         temp = thermostat.temperature.valueC
@@ -66,19 +68,21 @@ async def poll_status(mac: str) -> None:
             "currentHeatingCoolingState": mode_status,
             "currentTemperature": temp
         }
-    except BleakError:
-        logging.error(f"Polling: BLE error for {mac}")
+        logging.info(f"Polling: Updated status_store for {mac}: {status_store[mac]}")  # <-- Add this line
+    except BleakError as e:
+        logging.error(f"Polling: BLE error for {mac}: {e}")  # <-- Show BLE error details
         # Device not found or BLE error, do not update status_store
         raise
-    except EqivaException:
-        logging.error(f"Polling: EqivaException for {mac}")
+    except EqivaException as e:
+        logging.error(f"Polling: EqivaException for {mac}: {e}")  # <-- Show Eqiva error details
         # Do not update status_store on error
         pass
     finally:
         try:
             await thermostat.disconnect()
-        except Exception:
-            pass
+            logging.info(f"Polling: Disconnected from {mac}")  # <-- Add this line
+        except Exception as e:
+            logging.error(f"Polling: Error disconnecting from {mac}: {e}")  # <-- Add this line
 
 def polling_loop() -> None:
     loop = asyncio.new_event_loop()
