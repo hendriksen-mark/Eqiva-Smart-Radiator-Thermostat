@@ -8,7 +8,7 @@ from eqiva import (EqivaException, Event, OpenWindowConfig, Program,
 
 async def do_stuff() -> None:
 
-    thermostat = Thermostat('00:1A:22:0C:19:60')
+    thermostat = Thermostat('00:1A:22:16:3D:E7')
     try:
         await thermostat.connect()
 
@@ -64,7 +64,32 @@ async def do_stuff() -> None:
     if thermostat:
         await thermostat.disconnect()
 
+async def do_stuff1() -> None:
+
+    thermostat = Thermostat('00:1A:22:16:3D:E7')
+    try:
+        await thermostat.connect()
+
+        # Meta information
+        await thermostat.requestName()
+        await thermostat.requestVendor()
+        await thermostat.requestSerialNo()
+
+        # request current status
+        await thermostat.requestStatus()
+        print(str(thermostat))
+
+        # get programs
+        await thermostat.requestProgram(day=Program.DAY_MONDAY)
+        print(thermostat.programs[Program.DAY_MONDAY])
+
+    except EqivaException as ex:
+        print(ex.message)
+
+    if thermostat:
+        await thermostat.disconnect()
+
 
 if __name__ == '__main__':
 
-    asyncio.run(do_stuff())
+    asyncio.run(do_stuff1())
