@@ -77,6 +77,7 @@ def polling_loop() -> None:
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     while True:
+        load_status_store()  # <-- Add this line to reload new MACs added by API
         macs_to_poll = list(status_store.keys())
         logging.info(f"Polling MACs: {macs_to_poll}")  # <-- Add this line
         tasks = [poll_status(mac) for mac in macs_to_poll]
