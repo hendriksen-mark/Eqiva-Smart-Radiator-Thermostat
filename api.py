@@ -31,12 +31,17 @@ def load_status_store() -> None:
             data = yaml.safe_load(f)
             if isinstance(data, dict):
                 status_store = data
+            else:
+                status_store = {}  # Ensure it's always a dict if file is empty or invalid
+    else:
+        status_store = {}  # Ensure it's always a dict if file does not exist
 
 def save_status_store() -> None:
     with open(STATUS_YAML_PATH, "w") as f:
         yaml.safe_dump(status_store, f)
 
 async def poll_status(mac: str) -> None:
+    logging.info(f"Polling: Attempting to connect to {mac}")  # <-- Add this line for visibility
     thermostat = Thermostat(mac)
     try:
         await thermostat.connect()
@@ -62,9 +67,11 @@ async def poll_status(mac: str) -> None:
             "currentTemperature": temp
         }
     except BleakError:
+        logging.error(f"Polling: BLE error for {mac}")
         # Device not found or BLE error, do not update status_store
         raise
     except EqivaException:
+        logging.error(f"Polling: EqivaException for {mac}")
         # Do not update status_store on error
         pass
     finally:
@@ -77,14 +84,17 @@ def polling_loop() -> None:
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     while True:
-        load_status_store()  # <-- Add this line to reload new MACs added by API
+        load_status_store()
         macs_to_poll = list(status_store.keys())
-        logging.info(f"Polling MACs: {macs_to_poll}")  # <-- Add this line
+        logging.info(f"Polling MACs: {macs_to_poll}")
+        if not macs_to_poll:
+            logging.info("Polling: No MACs to poll, sleeping.")
         tasks = [poll_status(mac) for mac in macs_to_poll]
-        results = loop.run_until_complete(asyncio.gather(*tasks, return_exceptions=True))
-        for mac, result in zip(macs_to_poll, results):
-            if isinstance(result, Exception):
-                logging.error(f"Polling failed for {mac}: {type(result).__name__}: {result}")
+        if tasks:
+            results = loop.run_until_complete(asyncio.gather(*tasks, return_exceptions=True))
+            for mac, result in zip(macs_to_poll, results):
+                if isinstance(result, Exception):
+                    logging.error(f"Polling failed for {mac}: {type(result).__name__}: {result}")
         save_status_store()
         time.sleep(30)  # Poll every 30 seconds
 
