@@ -7,6 +7,7 @@ from eqiva import Thermostat, Temperature, EqivaException
 import yaml
 import os
 from bleak.exc import BleakDeviceNotFoundError  # <-- Add this import
+from typing import Dict, Any, Optional
 
 logging.basicConfig(
     level=logging.INFO,
@@ -15,15 +16,15 @@ logging.basicConfig(
 
 app = Flask(__name__)
 
-STATUS_YAML_PATH = os.path.join(os.path.dirname(__file__), "status_store.yaml")
+STATUS_YAML_PATH: str = os.path.join(os.path.dirname(__file__), "status_store.yaml")
 
 # Store latest status per MAC
-status_store = {}
+status_store: Dict[str, Dict[str, Any]] = {}
 
-def format_mac(mac):
+def format_mac(mac: str) -> str:
     return mac.replace('-', ':').upper()
 
-def load_status_store():
+def load_status_store() -> None:
     global status_store
     if os.path.exists(STATUS_YAML_PATH):
         with open(STATUS_YAML_PATH, "r") as f:
@@ -31,11 +32,11 @@ def load_status_store():
             if isinstance(data, dict):
                 status_store = data
 
-def save_status_store():
+def save_status_store() -> None:
     with open(STATUS_YAML_PATH, "w") as f:
         yaml.safe_dump(status_store, f)
 
-async def poll_status(mac):
+async def poll_status(mac: str) -> None:
     thermostat = Thermostat(mac)
     try:
         await thermostat.connect()
@@ -72,24 +73,27 @@ async def poll_status(mac):
         except Exception:
             pass
 
-def polling_loop():
+def polling_loop() -> None:
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     while True:
         macs_to_poll = list(status_store.keys())
         tasks = [poll_status(mac) for mac in macs_to_poll]
-        loop.run_until_complete(asyncio.gather(*tasks))
+        results = loop.run_until_complete(asyncio.gather(*tasks, return_exceptions=True))
+        for mac, result in zip(macs_to_poll, results):
+            if isinstance(result, Exception):
+                logging.error(f"Polling failed for {mac}: {type(result).__name__}: {result}")
         save_status_store()
         time.sleep(30)  # Poll every 30 seconds
 
-def start_polling():
+def start_polling() -> None:
     load_status_store()
     t = threading.Thread(target=polling_loop, daemon=True)
     t.start()
 
 @app.route('/<mac>/<request_type>', defaults={'value': None}, methods=['GET'])
 @app.route('/<mac>/<request_type>/<value>', methods=['GET'])
-def handle(mac, request_type, value):
+def handle(mac: str, request_type: str, value: Optional[str]) -> Any:
     mac = format_mac(mac)
     # Support value from query string if not present in path
     if value is None:
@@ -136,7 +140,7 @@ def handle(mac, request_type, value):
         logging.error(f"Invalid request: mac={mac}, request_type={request_type}, value={value}")
         return jsonify({"error": "Invalid request"}), 400
 
-async def set_temperature(mac, temp):
+async def set_temperature(mac: str, temp: str) -> Dict[str, Any]:
     thermostat = Thermostat(mac)
     try:
         await thermostat.connect()
@@ -155,7 +159,7 @@ async def set_temperature(mac, temp):
         except Exception as e:
             logging.error(f"Error disconnecting from {mac}: {e}")
 
-async def set_mode(mac, mode):
+async def set_mode(mac: str, mode: str) -> Dict[str, Any]:
     thermostat = Thermostat(mac)
     try:
         await thermostat.connect()

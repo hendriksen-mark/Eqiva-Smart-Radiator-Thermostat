@@ -7,8 +7,7 @@ import sys
 import time
 from datetime import datetime, timedelta
 
-from bleak import (AdvertisementData, BleakClient, BleakError, BleakScanner,
-                   BLEDevice)
+from bleak import (BleakClient, BleakError, BleakScanner, BLEDevice)#AdvertisementData
 
 _MAX_BLE_CONNECTIONS = 8
 
@@ -946,7 +945,7 @@ class ThermostatController():
         else:
             consumed_filter = None
 
-        def callback(device: BLEDevice, advertising_data: AdvertisementData):
+        def callback(device: BLEDevice):  # , advertising_data: AdvertisementData):
 
             if device not in found_devices and device.name:
                 found_devices.add(device)
