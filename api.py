@@ -78,6 +78,7 @@ def polling_loop() -> None:
     asyncio.set_event_loop(loop)
     while True:
         macs_to_poll = list(status_store.keys())
+        logging.info(f"Polling MACs: {macs_to_poll}")  # <-- Add this line
         tasks = [poll_status(mac) for mac in macs_to_poll]
         results = loop.run_until_complete(asyncio.gather(*tasks, return_exceptions=True))
         for mac, result in zip(macs_to_poll, results):
