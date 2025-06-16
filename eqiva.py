@@ -8,8 +8,8 @@ import time
 from datetime import datetime, timedelta
 
 from bleak import BleakClient, BleakError, BleakScanner
-from bleak.backends.device import BLEDevice
-from bleak.backends.scanner import AdvertisementData
+#from bleak.backends.device import BLEDevice
+from bleak.backends.scanner import AdvertisementData, BLEDevice
 
 _MAX_BLE_CONNECTIONS = 8
 
