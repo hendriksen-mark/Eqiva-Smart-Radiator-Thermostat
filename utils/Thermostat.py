@@ -1,14 +1,15 @@
 from datetime import datetime
 import asyncio
 from bleak import BleakClient
-from Listener import Listener
-from MyLogger import MyLogger
-from Program import Program
-from Temperature import Temperature
-from Vacation import Vacation
-from EqivaException import EqivaException
-from Mode import Mode
-from OpenWindowConfig import OpenWindowConfig
+
+from utils.Listener import Listener
+from utils.MyLogger import MyLogger
+from utils.Program import Program
+from utils.Temperature import Temperature
+from utils.Vacation import Vacation
+from utils.Mode import Mode
+from utils.OpenWindowConfig import OpenWindowConfig
+from utils.EqivaException import EqivaException
 
 LOGGER = MyLogger()
 
@@ -62,7 +63,7 @@ class Thermostat(BleakClient, Listener):
         self.temperature: Temperature = None
         self.valve: int = None
         self.vacation: Vacation = None
-        self.programs: 'list[Program]' = [None] * 7
+        self.programs: list = [None] * 7
         self.ecoTemperature: Temperature = None
         self.comfortTemperature: Temperature = None
         self.openWindowConfig: OpenWindowConfig = None

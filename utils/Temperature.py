@@ -1,4 +1,5 @@
-from EqivaException import EqivaException
+from utils.EqivaException import EqivaException
+
 
 class Temperature:
 

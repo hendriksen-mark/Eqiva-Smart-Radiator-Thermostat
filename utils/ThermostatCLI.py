@@ -8,18 +8,18 @@ from bleak import BleakError
 #from bleak.backends.device import BLEDevice
 from bleak.backends.scanner import BLEDevice
 
-from MyLogger import MyLogger
-from EqivaException import EqivaException
-from Temperature import Temperature
-from Event import Event
-from Program import Program
-from Vacation import Vacation
-from OpenWindowConfig import OpenWindowConfig
-from Mode import Mode
-from Listener import Listener
-from Thermostat import Thermostat
-from Alias import Alias
-from ThermostatController import ThermostatController
+from utils.MyLogger import MyLogger
+from utils.Thermostat import Thermostat
+from utils.Event import Event
+from utils.Listener import Listener
+from utils.Program import Program
+from utils.Temperature import Temperature
+from utils.Vacation import Vacation
+from utils.Mode import Mode
+from utils.OpenWindowConfig import OpenWindowConfig
+from utils.EqivaException import EqivaException
+from utils.Alias import Alias
+from utils.ThermostatController import ThermostatController
 
 _MAX_BLE_CONNECTIONS = 8
 
@@ -520,7 +520,7 @@ USAGE:   eqiva.py <mac_1/alias_1> [<mac_2/alias_2>] ... --<command_1> [<param_1>
                         await asyncio.gather(controller.requestProgram(day=Program.DAYS.index(command[ThermostatCLI._PARAMS][0])))
 
                     else:
-                        events: 'list[Event]' = list()
+                        events = list()  # type: ignore
                         temp = None
                         for i, param in enumerate(command[ThermostatCLI._PARAMS][1:]):
                             if i % 2:

@@ -1,7 +1,7 @@
 import os
 import re
-from Thermostat import Thermostat
-from MyLogger import MyLogger
+from utils.Thermostat import Thermostat
+from utils.MyLogger import MyLogger
 
 LOGGER = MyLogger()
 

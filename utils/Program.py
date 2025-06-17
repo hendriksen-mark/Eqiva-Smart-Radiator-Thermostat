@@ -1,5 +1,5 @@
-from Event import Event
-from EqivaException import EqivaException
+from utils.Event import Event
+from utils.EqivaException import EqivaException
 
 class Program():
 
@@ -22,7 +22,7 @@ class Program():
     DAYS_LONG = ["Saturday", "Sunday", "Monday",
                  "Tuesday", "Wednesday", "Thursday", "Friday"]
 
-    def __init__(self, events: 'list[Event]' = list()):
+    def __init__(self, events: list = list()):
 
         if not events:
             raise EqivaException('No events given')
@@ -30,7 +30,7 @@ class Program():
             raise EqivaException(
                 'More than 7 events given but maximum is 7 events per day')
 
-        self.events: 'list[Event]' = events
+        self.events: list = events
 
     @staticmethod
     def fromBytes(bytes: bytearray) -> 'Program':

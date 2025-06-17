@@ -1,5 +1,5 @@
-from Temperature import Temperature
-from EqivaException import EqivaException
+from utils.Temperature import Temperature
+from utils.EqivaException import EqivaException
 
 class OpenWindowConfig():
 
