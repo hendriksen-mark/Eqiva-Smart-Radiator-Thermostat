@@ -25,8 +25,6 @@ _MAX_BLE_CONNECTIONS = 8
 
 LOGGER = MyLogger()
 
-global use_bdaddr
-
 class ThermostatCLI():
 
     _USAGE = "usage"
@@ -179,9 +177,10 @@ class ThermostatCLI():
         }
     }
 
-    def __init__(self, argv: 'list[str]') -> None:
+    def __init__(self) -> None:
 
-        global use_bdaddr
+        argv: 'list[str]' = sys.argv
+
         self.alias: Alias = Alias()
         try:
 

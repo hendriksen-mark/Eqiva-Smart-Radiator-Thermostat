@@ -18,7 +18,7 @@ LOGGER = MyLogger()
 
 class ThermostatController():
 
-    use_bdaddr = False  # Class variable for global use_bdaddr
+    use_bdaddr = False
 
     def __init__(self, addresses: 'list[str]') -> None:
 
