@@ -3,7 +3,10 @@ from flask import Flask, request, jsonify
 import asyncio
 import threading
 import time
-from eqiva import Thermostat, Temperature, EqivaException
+#from eqiva import Thermostat, Temperature, EqivaException
+from utils.Thermostat import Thermostat
+from utils.Temperature import Temperature
+from utils.EqivaException import EqivaException
 import yaml
 import os
 from bleak import BleakError  # <-- Use this instead
