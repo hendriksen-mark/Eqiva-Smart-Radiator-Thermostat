@@ -16,7 +16,7 @@ LOGGER = MyLogger()
 class Thermostat(BleakClient, Listener):
 
     MAC_PREFIX = "00:1A:22:"
-    WAIT_NOTIFICATION = .2
+    WAIT_NOTIFICATION = 2
 
     CHARACTERISTIC_DEVICE_NAME_STRING = "00002a24-0000-1000-8000-00805f9b34fb"
     CHARACTERISTIC_VENDOR_STRING = "00002a29-0000-1000-8000-00805f9b34fb"
@@ -159,13 +159,21 @@ class Thermostat(BleakClient, Listener):
         await super().connect()
 
         if self.is_connected:
-
-            await self.start_notify(
-                Thermostat.CHARACTERISTIC_NOTIFICATION_HANDLE, callback=_notificationHandler)
-            LOGGER.info(f"{self.address}: successfully connected")
-
+            # Use the services property instead of get_services()
+            services = self.services
+            char = services.get_characteristic(Thermostat.CHARACTERISTIC_NOTIFICATION_HANDLE)
+            if char and "notify" in char.properties:
+                try:
+                    await self.start_notify(
+                        Thermostat.CHARACTERISTIC_NOTIFICATION_HANDLE, callback=_notificationHandler)
+                    LOGGER.info(f"{self.address}: successfully connected and notifications enabled")
+                except Exception as e:
+                    LOGGER.warning(f"{self.address}: failed to enable notifications for characteristic {Thermostat.CHARACTERISTIC_NOTIFICATION_HANDLE}: {e}")
+                    LOGGER.info(f"{self.address}: successfully connected (no notifications)")
+            else:
+                LOGGER.warning(f"{self.address}: notification not supported for characteristic {Thermostat.CHARACTERISTIC_NOTIFICATION_HANDLE}, skipping start_notify")
+                LOGGER.info(f"{self.address}: successfully connected (no notifications)")
         else:
-
             raise EqivaException(f"{self.address}: Connection failed")
 
     async def disconnect(self):
