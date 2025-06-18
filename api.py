@@ -103,7 +103,7 @@ def polling_loop() -> None:
                 if isinstance(result, Exception):
                     logging.error(f"Polling failed for {mac}: {type(result).__name__}: {result}")
         save_status_store()
-        time.sleep(30)  # Poll every 30 seconds
+        time.sleep(300)  # Poll every 300 seconds(5 minutes)
 
 def start_polling() -> None:
     load_status_store()
