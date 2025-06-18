@@ -14,12 +14,13 @@ from typing import Dict, Any, Optional
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(filename)s:%(lineno)d %(message)s"
+    format='%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(message)s'
 )
 
 app = Flask(__name__)
 
 STATUS_YAML_PATH: str = os.path.join(os.path.dirname(__file__), "status_store.yaml")
+HOST_HTTP_PORT: int = 5001
 
 # Store latest status per MAC
 status_store: Dict[str, Dict[str, Any]] = {}
@@ -204,4 +205,4 @@ async def set_mode(mac: str, mode: str) -> Dict[str, Any]:
 
 if __name__ == '__main__':
     start_polling()
-    app.run(host='0.0.0.0', port=5001)
+    app.run(host='0.0.0.0', port=HOST_HTTP_PORT)
