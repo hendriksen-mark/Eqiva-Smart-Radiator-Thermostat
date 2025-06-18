@@ -306,6 +306,7 @@ USAGE:   eqiva.py <mac_1/alias_1> [<mac_2/alias_2>] ... --<command_1> [<param_1>
         help += self._build_help(command="commands")
         help += self._build_help(command="json")
         help += self._build_help(command="log")
+        help += self._build_help(command="macos-use-bdaddr")
         help += self._build_help(command="help")
 
         help += "\n"
