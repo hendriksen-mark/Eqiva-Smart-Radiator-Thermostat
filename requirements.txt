@@ -1,3 +1,4 @@
 flask
 pyyaml
 bleak
+Adafruit_DHT
