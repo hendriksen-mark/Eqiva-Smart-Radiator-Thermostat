@@ -3,14 +3,14 @@ from flask import Flask, request, jsonify
 import asyncio
 import threading
 import time
-#from eqiva import Thermostat, Temperature, EqivaException
 from utils.Thermostat import Thermostat
 from utils.Temperature import Temperature
 from utils.EqivaException import EqivaException
 import yaml
 import os
-from bleak import BleakError  # <-- Use this instead
+from bleak import BleakError
 from typing import Dict, Any, Optional
+import Adafruit_DHT
 
 logging.basicConfig(
     level=logging.INFO,
@@ -21,6 +21,9 @@ app = Flask(__name__)
 
 STATUS_YAML_PATH: str = os.path.join(os.path.dirname(__file__), "status_store.yaml")
 HOST_HTTP_PORT: int = 5001
+
+sensor = Adafruit_DHT.DHT11
+DHT_PIN = 4
 
 # Store latest status per MAC
 status_store: Dict[str, Dict[str, Any]] = {}
@@ -36,27 +39,41 @@ def load_status_store() -> None:
             if isinstance(data, dict):
                 status_store = data
             else:
-                status_store = {}  # Ensure it's always a dict if file is empty or invalid
+                status_store = {}
     else:
-        status_store = {}  # Ensure it's always a dict if file does not exist
+        status_store = {}
 
 def save_status_store() -> None:
     with open(STATUS_YAML_PATH, "w") as f:
         yaml.safe_dump(status_store, f)
+
+def read_dht_temperature() -> float:
+    """
+    Read the temperature from the DHT sensor.
+    Replace this stub with actual sensor reading code.
+    """
+    try:
+        humidity, temperature = Adafruit_DHT.read_retry(sensor, DHT_PIN)
+        return humidity, temperature if temperature is not None else None
+    except Exception as e:
+        logging.error(f"Error reading DHT sensor: {e}")
+        return None
 
 async def poll_status(mac: str) -> None:
     logging.info(f"Polling: Attempting to connect to {mac}")
     thermostat = Thermostat(mac)
     try:
         await thermostat.connect()
-        logging.info(f"Polling: Connected to {mac}")  # <-- Add this line
+        logging.info(f"Polling: Connected to {mac}")
         await thermostat.requestStatus()
-        logging.info(f"Polling: Status requested from {mac}")  # <-- Add this line
+        logging.info(f"Polling: Status requested from {mac}")
         mode = thermostat.mode
         valve = thermostat.valve
         temp = thermostat.temperature.valueC
 
-        # Map modes to PHP logic
+        dht_temp = read_dht_temperature()
+        current_hum, current_temp = dht_temp if dht_temp is not None else (0.0, temp)
+
         if mode == 'off':
             mode_status = 0
         elif valve and valve > 0:
@@ -70,23 +87,22 @@ async def poll_status(mac: str) -> None:
             "targetHeatingCoolingState": 3 if mode == 'auto' else (1 if mode == 'manual' else 0),
             "targetTemperature": temp,
             "currentHeatingCoolingState": mode_status,
-            "currentTemperature": temp
+            "currentTemperature": current_temp,
+            "currentRelativeHumidity": current_hum
         }
-        logging.info(f"Polling: Updated status_store for {mac}: {status_store[mac]}")  # <-- Add this line
+        logging.info(f"Polling: Updated status_store for {mac}: {status_store[mac]}")
     except BleakError as e:
-        logging.error(f"Polling: BLE error for {mac}: {e}")  # <-- Show BLE error details
-        # Device not found or BLE error, do not update status_store
+        logging.error(f"Polling: BLE error for {mac}: {e}")
         raise
     except EqivaException as e:
-        logging.error(f"Polling: EqivaException for {mac}: {e}")  # <-- Show Eqiva error details
-        # Do not update status_store on error
+        logging.error(f"Polling: EqivaException for {mac}: {e}")
         pass
     finally:
         try:
             await thermostat.disconnect()
-            logging.info(f"Polling: Disconnected from {mac}")  # <-- Add this line
+            logging.info(f"Polling: Disconnected from {mac}")
         except Exception as e:
-            logging.error(f"Polling: Error disconnecting from {mac}: {e}")  # <-- Add this line
+            logging.error(f"Polling: Error disconnecting from {mac}: {e}")
 
 def polling_loop() -> None:
     loop = asyncio.new_event_loop()
@@ -104,7 +120,7 @@ def polling_loop() -> None:
                 if isinstance(result, Exception):
                     logging.error(f"Polling failed for {mac}: {type(result).__name__}: {result}")
         save_status_store()
-        time.sleep(300)  # Poll every 300 seconds(5 minutes)
+        time.sleep(300)
 
 def start_polling() -> None:
     load_status_store()
@@ -115,13 +131,11 @@ def start_polling() -> None:
 @app.route('/<mac>/<request_type>/<value>', methods=['GET'])
 def handle(mac: str, request_type: str, value: Optional[str]) -> Any:
     mac = format_mac(mac)
-    # Support value from query string if not present in path
     if value is None:
         value = request.args.get("value")
     logging.info(f"Received request: mac={mac}, request_type={request_type}, value={value}")
     if request_type == 'status':
         if mac not in status_store:
-            # Add unknown MAC to status_store with default values and return immediately
             status_store[mac] = {
                 "targetHeatingCoolingState": 0,
                 "targetTemperature": 20.0,
