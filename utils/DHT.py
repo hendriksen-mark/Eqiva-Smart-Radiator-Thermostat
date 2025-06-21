@@ -5,7 +5,7 @@
 # Public Domain
 
 import time
-import pigpio
+import pigpio # type: ignore
 
 DHTAUTO=0
 DHT11=1
@@ -210,7 +210,7 @@ class sensor:
 
 if __name__== "__main__":
    import sys
-   import pigpio
+   import pigpio # type: ignore
    import DHT
 
    def callback(data):
