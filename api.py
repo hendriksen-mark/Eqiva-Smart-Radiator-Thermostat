@@ -34,7 +34,7 @@ latest_humidity: Optional[float] = None
 dht_lock = Lock()
 
 sensor = Adafruit_DHT.DHT22
-DHT_PIN = 25
+DHT_PIN = 24
 
 STATUS_YAML_PATH: str = os.path.join(os.path.dirname(__file__), "status_store.yaml")
 HOST_HTTP_PORT: int = 5002
