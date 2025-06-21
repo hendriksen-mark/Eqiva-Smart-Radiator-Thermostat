@@ -1,4 +1,4 @@
 flask
 pyyaml
 bleak
-pigpio
+git+https://github.com/eliotg/Adafruit_Python_DHT.git
