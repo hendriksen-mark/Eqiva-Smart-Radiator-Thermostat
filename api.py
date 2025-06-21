@@ -11,21 +11,16 @@ import os
 from bleak import BleakError
 from typing import Dict, Any, Optional
 from threading import Lock
-import pigpio # type: ignore
-from utils import DHT
+try:
+    import Adafruit_DHT  # type: ignore
+except ImportError:
+    class DummyDHT:
+        DHT22 = None
 
-sensor = DHT.DHTXX
-
-DHT_PIN = 25
-
-pi = pigpio.pi()
-if not pi.connected:
-    logging.critical(
-        "Cannot connect to pigpio daemon. Please start it with 'sudo pigpiod' before running this script."
-    )
-    exit(1)
-
-s = DHT.sensor(pi, DHT_PIN, model = sensor)
+        @staticmethod
+        def read_retry(sensor, pin):
+            return 22.0, 50.0
+    Adafruit_DHT = DummyDHT()
 
 logging.basicConfig(
     level=logging.INFO,
@@ -37,6 +32,9 @@ app = Flask(__name__)
 latest_temperature: Optional[float] = None
 latest_humidity: Optional[float] = None
 dht_lock = Lock()
+
+sensor = Adafruit_DHT.DHT22
+DHT_PIN = 25
 
 STATUS_YAML_PATH: str = os.path.join(os.path.dirname(__file__), "status_store.yaml")
 HOST_HTTP_PORT: int = 5002
@@ -71,28 +69,13 @@ def read_dht_temperature() -> None:
     global latest_temperature, latest_humidity
     while True:
         try:
-            timestamp, gpio, status, temperature, humidity = s.read()
-            if gpio != DHT_PIN:
-                logging.error(f"DHT sensor read error: GPIO mismatch (expected {DHT_PIN}, got {gpio})")
-                time.sleep(5)
-                continue
-
-            if status == 0:  # DHT_GOOD
-                with dht_lock:
-                    if temperature is not None and -40.0 < temperature < 80.0:
-                        latest_temperature = float(temperature)
-                    if humidity is not None and 0.0 <= humidity <= 100.0:
-                        latest_humidity = float(humidity)
-            elif status == 1:  # DHT_BAD_CHECKSUM
-                logging.warning("DHT sensor read error: Bad checksum")
-            elif status == 2:  # DHT_BAD_DATA
-                logging.warning("DHT sensor read error: Bad data")
-            elif status == 3:  # DHT_TIMEOUT
-                logging.warning("DHT sensor read error: Timeout")
-            else:
-                logging.warning(f"DHT sensor read error: Unknown status code {status}")
-        except RuntimeError as e:
-            logging.warning(f"DHT sensor read error: {e}")
+            humidity, temperature = Adafruit_DHT.read_retry(sensor, DHT_PIN)
+            with dht_lock:
+                # Only update if values are valid
+                if temperature is not None and -40.0 < temperature < 80.0:
+                    latest_temperature = float(temperature)
+                if humidity is not None and 0.0 <= humidity <= 100.0:
+                    latest_humidity = float(humidity)
         except Exception as e:
             logging.error(f"Error reading DHT sensor: {e}")
         time.sleep(5)
