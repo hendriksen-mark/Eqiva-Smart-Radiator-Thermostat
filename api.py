@@ -33,11 +33,11 @@ latest_temperature: Optional[float] = None
 latest_humidity: Optional[float] = None
 dht_lock = Lock()
 
+sensor = Adafruit_DHT.DHT22
+DHT_PIN = 25
+
 STATUS_YAML_PATH: str = os.path.join(os.path.dirname(__file__), "status_store.yaml")
 HOST_HTTP_PORT: int = 5001
-
-sensor = Adafruit_DHT.DHT22
-DHT_PIN = 4
 
 status_store: Dict[str, Dict[str, Any]] = {}
 
