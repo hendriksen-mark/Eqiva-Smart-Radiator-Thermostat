@@ -11,18 +11,18 @@ import os
 from bleak import BleakError
 from typing import Dict, Any, Optional
 from threading import Lock
-import pigpio
+import pigpio # type: ignore
 from utils import DHT
 
 sensor = DHT.DHTXX
 
-pin = 25
+DHT_PIN = 25
 
 pi = pigpio.pi()
 if not pi.connected:
   exit()
 
-s = DHT.sensor(pi, pin, model = sensor)
+s = DHT.sensor(pi, DHT_PIN, model = sensor)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -36,7 +36,7 @@ latest_humidity: Optional[float] = None
 dht_lock = Lock()
 
 STATUS_YAML_PATH: str = os.path.join(os.path.dirname(__file__), "status_store.yaml")
-HOST_HTTP_PORT: int = 5001
+HOST_HTTP_PORT: int = 5002
 
 status_store: Dict[str, Dict[str, Any]] = {}
 
@@ -69,8 +69,8 @@ def read_dht_temperature() -> None:
     while True:
         try:
             timestamp, gpio, status, temperature, humidity = s.read()
-            if gpio != pin:
-                logging.error(f"DHT sensor read error: GPIO mismatch (expected {pin}, got {gpio})")
+            if gpio != DHT_PIN:
+                logging.error(f"DHT sensor read error: GPIO mismatch (expected {DHT_PIN}, got {gpio})")
                 time.sleep(5)
                 continue
 
