@@ -11,13 +11,18 @@ import os
 from bleak import BleakError
 from typing import Dict, Any, Optional
 from threading import Lock
+import pigpio
+import DHT
 
-try:
-    import adafruit_dht # type: ignore
-    import board # type: ignore
-except ImportError:
-    adafruit_dht = None
-    board = None
+sensor = DHT.DHTXX
+
+pin = 25
+
+pi = pigpio.pi()
+if not pi.connected:
+  exit()
+
+s = DHT.sensor(pi, pin, model = sensor)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -29,16 +34,6 @@ app = Flask(__name__)
 latest_temperature: Optional[float] = None
 latest_humidity: Optional[float] = None
 dht_lock = Lock()
-
-# DHT22 sensor setup using adafruit-circuitpython-dht
-if adafruit_dht and board:
-    try:
-        dht_device = adafruit_dht.DHT22(board.D25)
-    except Exception as e:
-        dht_device = None
-        logging.error(f"Failed to initialize DHT22 sensor: {e}")
-else:
-    dht_device = None
 
 STATUS_YAML_PATH: str = os.path.join(os.path.dirname(__file__), "status_store.yaml")
 HOST_HTTP_PORT: int = 5001
@@ -71,13 +66,9 @@ def read_dht_temperature() -> None:
     If the sensor returns invalid values (None or out of range), do not update globals.
     """
     global latest_temperature, latest_humidity
-    if not dht_device:
-        logging.warning("DHT sensor not available or not supported on this platform.")
-        return
     while True:
         try:
-            temperature = dht_device.temperature
-            humidity = dht_device.humidity
+            timestamp, gpio, status, temperature, humidity = s.read()
             with dht_lock:
                 if temperature is not None and -40.0 < temperature < 80.0:
                     latest_temperature = float(temperature)
