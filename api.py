@@ -93,6 +93,8 @@ def get_dht() -> Any:
     Return the latest DHT temperature and humidity.
     If values are not available, return HTTP 503.
     """
+    logging.info("Received request for DHT sensor data")
+    global latest_temperature, latest_humidity
     with dht_lock:
         temp = latest_temperature
         hum = latest_humidity
