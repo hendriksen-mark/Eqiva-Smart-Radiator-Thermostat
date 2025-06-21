@@ -1,5 +1,4 @@
 flask
 pyyaml
 bleak
-adafruit-circuitpython-dht
-adafruit-blinka
+pigpio
