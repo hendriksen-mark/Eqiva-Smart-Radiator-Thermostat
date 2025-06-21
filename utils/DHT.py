@@ -5,21 +5,23 @@
 # Public Domain
 
 import time
-import pigpio # type: ignore
+import pigpio  # type: ignore
 
-DHTAUTO=0
-DHT11=1
-DHTXX=2
+DHTAUTO = 0
+DHT11 = 1
+DHTXX = 2
 
-DHT_GOOD=0
-DHT_BAD_CHECKSUM=1
-DHT_BAD_DATA=2
-DHT_TIMEOUT=3
+DHT_GOOD = 0
+DHT_BAD_CHECKSUM = 1
+DHT_BAD_DATA = 2
+DHT_TIMEOUT = 3
+
 
 class sensor:
    """
    A class to read the DHTXX temperature/humidity sensors.
    """
+
    def __init__(self, pi, gpio, model=DHTAUTO, callback=None):
       """
       Instantiate with the Pi and the GPIO connected to the
@@ -82,8 +84,8 @@ class sensor:
          div = -10.0
       else:
          div = 10.0
-      t = float(((b2&127)<<8) + b1) / div
-      h = float((b4<<8) + b3) / 10.0
+      t = float(((b2 & 127) << 8) + b1) / div
+      h = float((b4 << 8) + b3) / 10.0
       if (h <= 110.0) and (t >= -50.0) and (t <= 135.0):
          valid = True
       else:
@@ -111,12 +113,12 @@ class sensor:
       DHT44 |      |      |      |      |      |
             +------+------+------+------+------+
       """
-      b0 =  self._code        & 0xff
-      b1 = (self._code >>  8) & 0xff
+      b0 = self._code & 0xff
+      b1 = (self._code >> 8) & 0xff
       b2 = (self._code >> 16) & 0xff
       b3 = (self._code >> 24) & 0xff
       b4 = (self._code >> 32) & 0xff
-      
+
       chksum = (b1 + b2 + b3 + b4) & 0xFF
 
       if chksum == b0:
@@ -124,7 +126,7 @@ class sensor:
             valid, t, h = self._validate_DHT11(b1, b2, b3, b4)
          elif self._model == DHTXX:
             valid, t, h = self._validate_DHTXX(b1, b2, b3, b4)
-         else: # AUTO
+         else:  # AUTO
             # Try DHTXX first.
             valid, t, h = self._validate_DHTXX(b1, b2, b3, b4)
             if not valid:
@@ -174,7 +176,6 @@ class sensor:
          time.sleep(0.001)
       self._pi.set_mode(self._gpio, pigpio.INPUT)
 
-
    def cancel(self):
       """
       """
@@ -199,7 +200,7 @@ class sensor:
       3 DHT_TIMEOUT (no response from sensor)
       """
       self._trigger()
-      for i in range(5): # timeout after 0.25 seconds.
+      for i in range(5):  # timeout after 0.25 seconds.
          time.sleep(0.05)
          if self._new_data:
             break
@@ -208,35 +209,42 @@ class sensor:
           self._callback(datum)
       return datum
 
-if __name__== "__main__":
+
+if __name__ == "__main__":
    import sys
-   import pigpio # type: ignore
+   import pigpio  # type: ignore
    import DHT
+   import logging
+
+   logging.basicConfig(level=logging.INFO)
 
    def callback(data):
-      print("{:.3f} {:2d} {} {:3.1f} {:3.1f} *".
+      logging.info("{:.3f} {:2d} {} {:3.1f} {:3.1f} *".
          format(data[0], data[1], data[2], data[3], data[4]))
 
-   argc = len(sys.argv) # get number of command line arguments
+   argc = len(sys.argv)  # get number of command line arguments
 
    if argc < 2:
-      print("Need to specify at least one GPIO")
+      logging.error("Need to specify at least one GPIO")
       exit()
 
    pi = pigpio.pi()
    if not pi.connected:
-      exit()
+    logging.critical(
+        "Cannot connect to pigpio daemon. Please start it with 'sudo pigpiod' before running this script."
+    )
+    exit(1)
 
    # Instantiate a class for each GPIO
    # for testing use a GPIO+100 to mean use the callback
    S = []
-   for i in range(1, argc): # ignore first argument which is command name
-      g = int(sys.argv[i])
-      if (g >= 100):
-         s = DHT.sensor(pi, g-100, callback=callback)
-      else:
-         s = DHT.sensor(pi, g)
-      S.append((g,s)) # store GPIO and class
+   for i in range(1, argc):  # ignore first argument which is command name
+    g = int(sys.argv[i])
+    if (g >= 100):
+       s = DHT.sensor(pi, g-100, callback=callback)
+    else:
+       s = DHT.sensor(pi, g)
+    S.append((g,s)) # store GPIO and class
 
    while True:
       try:
@@ -245,7 +253,7 @@ if __name__== "__main__":
                s[1].read() # values displayed by callback
             else:
                d = s[1].read()
-               print("{:.3f} {:2d} {} {:3.1f} {:3.1f}".
+               logging.info("{:.3f} {:2d} {} {:3.1f} {:3.1f}".
                   format(d[0], d[1], d[2], d[3], d[4]))
          time.sleep(2)
       except KeyboardInterrupt:
@@ -253,5 +261,5 @@ if __name__== "__main__":
 
    for s in S:
       s[1].cancel()
-      print("cancelling {}".format(s[0]))
+      logging.info("cancelling {}".format(s[0]))
    pi.stop()
