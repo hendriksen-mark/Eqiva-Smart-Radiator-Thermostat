@@ -12,7 +12,7 @@ from bleak import BleakError
 from typing import Dict, Any, Optional
 from threading import Lock
 import pigpio
-import DHT
+from utils import DHT
 
 sensor = DHT.DHTXX
 
