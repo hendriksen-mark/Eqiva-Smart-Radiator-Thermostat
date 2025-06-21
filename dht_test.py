@@ -10,13 +10,13 @@ try:
 except ImportError:
     logging.warning("Adafruit_DHT module not found. Using dummy implementation.")
     class DummyDHT:
-        DHT11 = None
+        DHT22 = None
         @staticmethod
         def read_retry(sensor, pin):
             return 22.0, 50.0
     Adafruit_DHT = DummyDHT()
 
-sensor = Adafruit_DHT.DHT11
+sensor = Adafruit_DHT.DHT22
 DHT_PIN = 25
 
 def read_dht_temperature() -> float:
@@ -46,7 +46,7 @@ def main():
     """
     Main function to read and log the DHT sensor data.
     """
-    logging.info("Starting DHT sensor reading...")
+    logging.info(f"Starting DHT sensor reading on pin {DHT_PIN}...")
     result = read_dht_temperature()
     if result is not None:
         humidity, temperature = result
