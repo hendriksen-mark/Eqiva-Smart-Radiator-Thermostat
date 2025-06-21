@@ -70,12 +70,19 @@ def read_dht_temperature() -> None:
     while True:
         try:
             humidity, temperature = Adafruit_DHT.read_retry(sensor, DHT_PIN)
+            logging.debug(f"Raw DHT read: temperature={temperature}, humidity={humidity}")
             with dht_lock:
                 # Only update if values are valid
                 if temperature is not None and -40.0 < temperature < 80.0:
                     latest_temperature = float(temperature)
+                    logging.debug(f"Updated latest_temperature: {latest_temperature}")
+                else:
+                    logging.debug("Temperature value not updated (None or out of range)")
                 if humidity is not None and 0.0 <= humidity <= 100.0:
                     latest_humidity = float(humidity)
+                    logging.debug(f"Updated latest_humidity: {latest_humidity}")
+                else:
+                    logging.debug("Humidity value not updated (None or out of range)")
         except Exception as e:
             logging.error(f"Error reading DHT sensor: {e}")
         time.sleep(5)
