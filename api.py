@@ -20,7 +20,10 @@ DHT_PIN = 25
 
 pi = pigpio.pi()
 if not pi.connected:
-  exit()
+    logging.critical(
+        "Cannot connect to pigpio daemon. Please start it with 'sudo pigpiod' before running this script."
+    )
+    exit(1)
 
 s = DHT.sensor(pi, DHT_PIN, model = sensor)
 
