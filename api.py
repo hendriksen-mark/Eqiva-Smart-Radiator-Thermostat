@@ -74,12 +74,12 @@ def read_dht_temperature() -> None:
             with dht_lock:
                 # Only update if values are valid
                 if temperature is not None and -40.0 < temperature < 80.0:
-                    latest_temperature = float(temperature)
+                    latest_temperature = round(float(temperature), 1)
                     logging.debug(f"Updated latest_temperature: {latest_temperature}")
                 else:
                     logging.debug("Temperature value not updated (None or out of range)")
                 if humidity is not None and 0.0 <= humidity <= 100.0:
-                    latest_humidity = float(humidity)
+                    latest_humidity = round(float(humidity), 1)
                     logging.debug(f"Updated latest_humidity: {latest_humidity}")
                 else:
                     logging.debug("Humidity value not updated (None or out of range)")
