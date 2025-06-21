@@ -10,7 +10,17 @@ import yaml
 import os
 from bleak import BleakError
 from typing import Dict, Any, Optional
-import Adafruit_DHT
+from threading import Lock
+try:
+    import Adafruit_DHT  # type: ignore
+except ImportError:
+    class DummyDHT:
+        DHT22 = None
+
+        @staticmethod
+        def read_retry(sensor, pin):
+            return 22.0, 50.0
+    Adafruit_DHT = DummyDHT()
 
 logging.basicConfig(
     level=logging.INFO,
@@ -19,13 +29,16 @@ logging.basicConfig(
 
 app = Flask(__name__)
 
+latest_temperature: Optional[float] = None
+latest_humidity: Optional[float] = None
+dht_lock = Lock()
+
 STATUS_YAML_PATH: str = os.path.join(os.path.dirname(__file__), "status_store.yaml")
 HOST_HTTP_PORT: int = 5001
 
-sensor = Adafruit_DHT.DHT11
+sensor = Adafruit_DHT.DHT22
 DHT_PIN = 4
 
-# Store latest status per MAC
 status_store: Dict[str, Dict[str, Any]] = {}
 
 def format_mac(mac: str) -> str:
@@ -47,17 +60,41 @@ def save_status_store() -> None:
     with open(STATUS_YAML_PATH, "w") as f:
         yaml.safe_dump(status_store, f)
 
-def read_dht_temperature() -> float:
+def read_dht_temperature() -> None:
     """
-    Read the temperature from the DHT sensor.
-    Replace this stub with actual sensor reading code.
+    Continuously read the temperature and humidity from the DHT sensor
+    and update the global variables every 5 seconds.
+    If the sensor returns invalid values (None or out of range), do not update globals.
     """
-    try:
-        humidity, temperature = Adafruit_DHT.read_retry(sensor, DHT_PIN)
-        return humidity, temperature if temperature is not None else None
-    except Exception as e:
-        logging.error(f"Error reading DHT sensor: {e}")
-        return None
+    global latest_temperature, latest_humidity
+    while True:
+        try:
+            humidity, temperature = Adafruit_DHT.read_retry(sensor, DHT_PIN)
+            with dht_lock:
+                # Only update if values are valid
+                if temperature is not None and -40.0 < temperature < 80.0:
+                    latest_temperature = float(temperature)
+                if humidity is not None and 0.0 <= humidity <= 100.0:
+                    latest_humidity = float(humidity)
+        except Exception as e:
+            logging.error(f"Error reading DHT sensor: {e}")
+        time.sleep(5)
+
+@app.route('/dht', methods=['GET'])
+def get_dht() -> Any:
+    """
+    Return the latest DHT temperature and humidity.
+    If values are not available, return HTTP 503.
+    """
+    with dht_lock:
+        temp = latest_temperature
+        hum = latest_humidity
+    if temp is None or hum is None:
+        return jsonify({"error": "DHT sensor data not available"}), 503
+    return jsonify({
+        "temperature": temp,
+        "humidity": hum
+    })
 
 async def poll_status(mac: str) -> None:
     logging.info(f"Polling: Attempting to connect to {mac}")
@@ -71,8 +108,10 @@ async def poll_status(mac: str) -> None:
         valve = thermostat.valve
         temp = thermostat.temperature.valueC
 
-        dht_temp = read_dht_temperature()
-        current_hum, current_temp = dht_temp if dht_temp is not None else (0.0, temp)
+        global latest_temperature, latest_humidity
+        with dht_lock:
+            current_temp = latest_temperature if latest_temperature is not None else temp
+            current_hum = latest_humidity if latest_humidity is not None else 50.0
 
         if mode == 'off':
             mode_status = 0
@@ -90,7 +129,8 @@ async def poll_status(mac: str) -> None:
             "currentTemperature": current_temp,
             "currentRelativeHumidity": current_hum
         }
-        logging.info(f"Polling: Updated status_store for {mac}: {status_store[mac]}")
+        logging.info(
+            f"Polling: Updated status_store for {mac}: {status_store[mac]}")
     except BleakError as e:
         logging.error(f"Polling: BLE error for {mac}: {e}")
         raise
@@ -115,17 +155,25 @@ def polling_loop() -> None:
             logging.info("Polling: No MACs to poll, sleeping.")
         tasks = [poll_status(mac) for mac in macs_to_poll]
         if tasks:
-            results = loop.run_until_complete(asyncio.gather(*tasks, return_exceptions=True))
+            results = loop.run_until_complete(
+                asyncio.gather(*tasks, return_exceptions=True))
             for mac, result in zip(macs_to_poll, results):
                 if isinstance(result, Exception):
-                    logging.error(f"Polling failed for {mac}: {type(result).__name__}: {result}")
+                    logging.error(
+                        f"Polling failed for {mac}: {type(result).__name__}: {result}")
         save_status_store()
-        time.sleep(300)
+        time.sleep(30)
 
 def start_polling() -> None:
+    """
+    Start background threads for polling thermostats and reading DHT sensor.
+    Prevent duplicate threads if called multiple times.
+    """
     load_status_store()
-    t = threading.Thread(target=polling_loop, daemon=True)
-    t.start()
+    if not hasattr(start_polling, "_started"):
+        threading.Thread(target=polling_loop, daemon=True).start()
+        threading.Thread(target=read_dht_temperature, daemon=True).start()
+        start_polling._started = True
 
 @app.route('/<mac>/<request_type>', defaults={'value': None}, methods=['GET'])
 @app.route('/<mac>/<request_type>/<value>', methods=['GET'])
@@ -133,23 +181,20 @@ def handle(mac: str, request_type: str, value: Optional[str]) -> Any:
     mac = format_mac(mac)
     if value is None:
         value = request.args.get("value")
-    logging.info(f"Received request: mac={mac}, request_type={request_type}, value={value}")
+    logging.info(
+        f"Received request: mac={mac}, request_type={request_type}, value={value}")
     if request_type == 'status':
         if mac not in status_store:
             status_store[mac] = {
                 "targetHeatingCoolingState": 0,
                 "targetTemperature": 20.0,
                 "currentHeatingCoolingState": 0,
-                "currentTemperature": 20.0
+                "currentTemperature": 20.0,
+                "currentRelativeHumidity": 50.0
             }
             save_status_store()
             logging.info(f"MAC {mac} not found, returning default values.")
-            return jsonify(status_store[mac])
-        if mac in status_store:
-            return jsonify(status_store[mac])
-        else:
-            logging.error(f"No status available for MAC {mac}")
-            return jsonify({"error": "No status available"}), 404
+        return jsonify(status_store[mac])
     elif request_type == 'targetTemperature' and value:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -168,10 +213,12 @@ def handle(mac: str, request_type: str, value: Optional[str]) -> Any:
         except BleakError:
             logging.error(f"Device with address {mac} was not found")
             return jsonify({"result": "error", "message": f"Device with address {mac} was not found"}), 404
-        logging.info(f"Set targetHeatingCoolingState for {mac} to {value}: {result}")
+        logging.info(
+            f"Set targetHeatingCoolingState for {mac} to {value}: {result}")
         return jsonify(result)
     else:
-        logging.error(f"Invalid request: mac={mac}, request_type={request_type}, value={value}")
+        logging.error(
+            f"Invalid request: mac={mac}, request_type={request_type}, value={value}")
         return jsonify({"error": "Invalid request"}), 400
 
 async def set_temperature(mac: str, temp: str) -> Dict[str, Any]:
