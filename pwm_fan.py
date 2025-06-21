@@ -4,9 +4,9 @@
 # Works well with a Pi Desktop Case with OLED Stats Display
 # Installation & Setup Instructions - https://www.the-diy-life.com/connecting-a-pwm-fan-to-a-raspberry-pi/
 
-import RPi.GPIO as IO          # Calling GPIO to allow use of the GPIO pins
-import time                    # Calling time to allow delays to be used
-import subprocess              # Calling subprocess to get the CPU temperature
+import RPi.GPIO as IO # type: ignore
+import time
+import subprocess
 
 FAN_GPIO_PIN = 14
 FAN_PWM_FREQ = 100
