@@ -69,11 +69,25 @@ def read_dht_temperature() -> None:
     while True:
         try:
             timestamp, gpio, status, temperature, humidity = s.read()
-            with dht_lock:
-                if temperature is not None and -40.0 < temperature < 80.0:
-                    latest_temperature = float(temperature)
-                if humidity is not None and 0.0 <= humidity <= 100.0:
-                    latest_humidity = float(humidity)
+            if gpio != pin:
+                logging.error(f"DHT sensor read error: GPIO mismatch (expected {pin}, got {gpio})")
+                time.sleep(5)
+                continue
+
+            if status == 0:  # DHT_GOOD
+                with dht_lock:
+                    if temperature is not None and -40.0 < temperature < 80.0:
+                        latest_temperature = float(temperature)
+                    if humidity is not None and 0.0 <= humidity <= 100.0:
+                        latest_humidity = float(humidity)
+            elif status == 1:  # DHT_BAD_CHECKSUM
+                logging.warning("DHT sensor read error: Bad checksum")
+            elif status == 2:  # DHT_BAD_DATA
+                logging.warning("DHT sensor read error: Bad data")
+            elif status == 3:  # DHT_TIMEOUT
+                logging.warning("DHT sensor read error: Timeout")
+            else:
+                logging.warning(f"DHT sensor read error: Unknown status code {status}")
         except RuntimeError as e:
             logging.warning(f"DHT sensor read error: {e}")
         except Exception as e:
