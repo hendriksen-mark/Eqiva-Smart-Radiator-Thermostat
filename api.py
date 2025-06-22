@@ -252,6 +252,8 @@ async def set_temperature(mac: str, temp: str) -> Dict[str, Any]:
         logging.info(f"Set temperature for {mac} to {temp}")
         await safe_connect(thermostat)
         await thermostat.setTemperature(temperature=Temperature(valueC=float(temp)))
+        status_store[mac]["targetTemperature"] = float(temp)
+        save_status_store()
         return {"result": "ok"}
     except BleakError:
         logging.error(f"Device with address {mac} was not found")
@@ -275,6 +277,8 @@ async def set_mode(mac: str, mode: str) -> Dict[str, Any]:
             await thermostat.setModeManual()
         elif mode == '3':
             await thermostat.setModeAuto()
+        status_store[mac]["targetHeatingCoolingState"] = 3 if mode == '3' else (1 if mode in ('1', '2') else 0)
+        save_status_store()
         logging.info(f"Set mode for {mac} to {mode}")
         return {"result": "ok"}
     except BleakError:
