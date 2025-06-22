@@ -124,9 +124,9 @@ async def poll_status(mac: str) -> None:
 
         if mode == 'off':
             mode_status = 0
-        elif valve and valve > 0:
+        elif valve and valve > 0 and mode == 'manual':
             mode_status = 1
-        elif valve == 0:
+        elif valve == 0 and mode == 'manual':
             mode_status = 2
         else:
             mode_status = 3 if mode == 'auto' else 1
