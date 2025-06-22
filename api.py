@@ -122,6 +122,8 @@ async def poll_status(mac: str) -> None:
             current_temp = latest_temperature if latest_temperature is not None else temp
             current_hum = latest_humidity if latest_humidity is not None else 50.0
 
+        logging.info(f"Polling: Mode={mode}, Valve={valve}, Temp={temp}, Current Temp={current_temp}, Current Humidity={current_hum}")
+
         if mode == 'off':
             mode_status = 0
         elif valve and valve > 0 and mode == 'manual':
