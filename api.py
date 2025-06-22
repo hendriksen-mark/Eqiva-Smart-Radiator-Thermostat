@@ -133,27 +133,22 @@ async def poll_status(mac: str) -> None:
         valve = thermostat.valve
         temp = thermostat.temperature.valueC
 
-        # Extract the main mode as a string
-        main_mode = str(mode.modes[0]) if hasattr(mode, 'modes') and mode.modes else str(mode)
-
         global latest_temperature, latest_humidity
         with dht_lock:
             current_temp = latest_temperature if latest_temperature is not None else temp
             current_hum = latest_humidity if latest_humidity is not None else 50.0
 
-        logging.info(f"Polling: mode={mode} main_Mode={main_mode}, Valve={valve}, Temp={temp}, Current Temp={current_temp}, Current Humidity={current_hum}")
-
-        if main_mode == 'OFF':
+        if 'OFF' in mode:
             mode_status = 0
-        elif valve and valve > 0 and main_mode == 'MANUAL':
+        elif valve and valve > 0 and 'MANUAL' in mode:
             mode_status = 1
-        elif valve == 0 and main_mode == 'MANUAL':
+        elif valve == 0 and 'MANUAL' in mode:
             mode_status = 2
         else:
-            mode_status = 3 if main_mode == 'AUTO' else 1
+            mode_status = 3 if 'AUTO' in mode else 1
 
         status_store[mac] = {
-            "targetHeatingCoolingState": 3 if main_mode == 'AUTO' else (1 if main_mode == 'MANUAL' else 0),
+            "targetHeatingCoolingState": 3 if 'AUTO' in mode else (1 if 'MANUAL' in mode else 0),
             "targetTemperature": temp,
             "currentHeatingCoolingState": mode_status,
             "currentTemperature": current_temp,
