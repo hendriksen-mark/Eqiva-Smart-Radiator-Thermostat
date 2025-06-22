@@ -11,6 +11,7 @@ import os
 from bleak import BleakError
 from typing import Dict, Any, Optional
 from threading import Lock
+import signal
 try:
     import Adafruit_DHT  # type: ignore
 except ImportError:
@@ -40,6 +41,8 @@ STATUS_YAML_PATH: str = os.path.join(os.path.dirname(__file__), "status_store.ya
 HOST_HTTP_PORT: int = 5002
 
 status_store: Dict[str, Dict[str, Any]] = {}
+connected_thermostats = set()
+connected_thermostats_lock = threading.Lock()
 
 def format_mac(mac: str) -> str:
     return mac.replace('-', ':').upper()
@@ -105,11 +108,24 @@ def get_dht() -> Any:
         "humidity": hum
     })
 
+async def safe_connect(thermostat: Thermostat) -> None:
+    await thermostat.connect()
+    with connected_thermostats_lock:
+        connected_thermostats.add(thermostat)
+
+async def safe_disconnect(thermostat: Thermostat) -> None:
+    try:
+        await thermostat.disconnect()
+    except Exception as e:
+        logging.error(f"Error disconnecting from {thermostat.mac}: {e}")
+    with connected_thermostats_lock:
+        connected_thermostats.discard(thermostat)
+
 async def poll_status(mac: str) -> None:
     logging.info(f"Polling: Attempting to connect to {mac}")
     thermostat = Thermostat(mac)
     try:
-        await thermostat.connect()
+        await safe_connect(thermostat)
         logging.info(f"Polling: Connected to {mac}")
         await thermostat.requestStatus()
         logging.info(f"Polling: Status requested from {mac}")
@@ -117,24 +133,27 @@ async def poll_status(mac: str) -> None:
         valve = thermostat.valve
         temp = thermostat.temperature.valueC
 
+        # Extract the main mode as a string
+        main_mode = str(mode.modes[0]) if hasattr(mode, 'modes') and mode.modes else str(mode)
+
         global latest_temperature, latest_humidity
         with dht_lock:
             current_temp = latest_temperature if latest_temperature is not None else temp
             current_hum = latest_humidity if latest_humidity is not None else 50.0
 
-        logging.info(f"Polling: Mode={mode}, Valve={valve}, Temp={temp}, Current Temp={current_temp}, Current Humidity={current_hum}")
+        logging.info(f"Polling: Mode={main_mode}, Valve={valve}, Temp={temp}, Current Temp={current_temp}, Current Humidity={current_hum}")
 
-        if mode == 'off':
+        if main_mode == 'OFF':
             mode_status = 0
-        elif valve and valve > 0 and mode == 'manual':
+        elif valve and valve > 0 and main_mode == 'MANUAL':
             mode_status = 1
-        elif valve == 0 and mode == 'manual':
+        elif valve == 0 and main_mode == 'MANUAL':
             mode_status = 2
         else:
-            mode_status = 3 if mode == 'auto' else 1
+            mode_status = 3 if main_mode == 'AUTO' else 1
 
         status_store[mac] = {
-            "targetHeatingCoolingState": 3 if mode == 'auto' else (1 if mode == 'manual' else 0),
+            "targetHeatingCoolingState": 3 if main_mode == 'AUTO' else (1 if main_mode == 'MANUAL' else 0),
             "targetTemperature": temp,
             "currentHeatingCoolingState": mode_status,
             "currentTemperature": current_temp,
@@ -150,7 +169,7 @@ async def poll_status(mac: str) -> None:
         pass
     finally:
         try:
-            await thermostat.disconnect()
+            await safe_disconnect(thermostat)
             logging.info(f"Polling: Disconnected from {mac}")
         except Exception as e:
             logging.error(f"Polling: Error disconnecting from {mac}: {e}")
@@ -236,7 +255,7 @@ async def set_temperature(mac: str, temp: str) -> Dict[str, Any]:
     thermostat = Thermostat(mac)
     try:
         logging.info(f"Set temperature for {mac} to {temp}")
-        await thermostat.connect()
+        await safe_connect(thermostat)
         await thermostat.setTemperature(temperature=Temperature(valueC=float(temp)))
         return {"result": "ok"}
     except BleakError:
@@ -247,14 +266,14 @@ async def set_temperature(mac: str, temp: str) -> Dict[str, Any]:
         return {"result": "error", "message": str(ex)}
     finally:
         try:
-            await thermostat.disconnect()
+            await safe_disconnect(thermostat)
         except Exception as e:
             logging.error(f"Error disconnecting from {mac}: {e}")
 
 async def set_mode(mac: str, mode: str) -> Dict[str, Any]:
     thermostat = Thermostat(mac)
     try:
-        await thermostat.connect()
+        await safe_connect(thermostat)
         if mode == '0':
             await thermostat.setTemperatureOff()
         elif mode in ('1', '2'):
@@ -271,9 +290,31 @@ async def set_mode(mac: str, mode: str) -> Dict[str, Any]:
         return {"result": "error", "message": str(ex)}
     finally:
         try:
-            await thermostat.disconnect()
+            await safe_disconnect(thermostat)
         except Exception as e:
             logging.error(f"Error disconnecting from {mac}: {e}")
+
+def cleanup_thermostats():
+    logging.info("Cleanup: Disconnecting all thermostats before exit...")
+    with connected_thermostats_lock:
+        thermostats = list(connected_thermostats)
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    for thermostat in thermostats:
+        try:
+            loop.run_until_complete(safe_disconnect(thermostat))
+        except Exception as e:
+            logging.error(f"Cleanup: Error disconnecting from {thermostat.mac}: {e}")
+    loop.close()
+    logging.info("Cleanup: All thermostats disconnected.")
+
+def handle_exit(signum, frame):
+    logging.info(f"Received signal {signum}, shutting down gracefully...")
+    cleanup_thermostats()
+    os._exit(0)
+
+signal.signal(signal.SIGTERM, handle_exit)
+signal.signal(signal.SIGINT, handle_exit)
 
 if __name__ == '__main__':
     start_polling()
