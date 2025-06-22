@@ -129,7 +129,7 @@ async def poll_status(mac: str) -> None:
         logging.info(f"Polling: Connected to {mac}")
         await thermostat.requestStatus()
         logging.info(f"Polling: Status requested from {mac}")
-        mode = thermostat.mode
+        mode = thermostat.mode.to_dict()
         valve = thermostat.valve
         temp = thermostat.temperature.valueC
 
@@ -141,7 +141,7 @@ async def poll_status(mac: str) -> None:
             current_temp = latest_temperature if latest_temperature is not None else temp
             current_hum = latest_humidity if latest_humidity is not None else 50.0
 
-        logging.info(f"Polling: Mode={main_mode}, Valve={valve}, Temp={temp}, Current Temp={current_temp}, Current Humidity={current_hum}")
+        logging.info(f"Polling: mode={mode} main_Mode={main_mode}, Valve={valve}, Temp={temp}, Current Temp={current_temp}, Current Humidity={current_hum}")
 
         if main_mode == 'OFF':
             mode_status = 0
