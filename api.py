@@ -12,6 +12,7 @@ from bleak import BleakError
 from typing import Dict, Any, Optional
 from threading import Lock
 import signal
+import subprocess
 try:
     import Adafruit_DHT  # type: ignore
 except ImportError:
@@ -62,6 +63,27 @@ def load_status_store() -> None:
 def save_status_store() -> None:
     with open(STATUS_YAML_PATH, "w") as f:
         yaml.safe_dump(status_store, f)
+
+def get_PI_temp():
+    """Read the CPU temperature and return it as a float in degrees Celsius."""
+    try:
+        output = subprocess.run(['vcgencmd', 'measure_temp'], capture_output=True, check=True)
+        temp_str = output.stdout.decode()
+        return float(temp_str.split('=')[1].split('\'')[0])
+    except (IndexError, ValueError, subprocess.CalledProcessError):
+        raise RuntimeError('Could not get temperature')
+
+@app.route('/pi_temp', methods=['GET'])
+def read_pi_temperature() -> Any:
+    """
+    Return the Raspberry Pi CPU temperature.
+    """
+    try:
+        temp = get_PI_temp()
+        return jsonify({"temperature": temp}), 200
+    except RuntimeError as e:
+        logging.error(f"Error reading Pi temperature: {e}")
+        return jsonify({"error": "Could not read Pi temperature"}), 503
 
 def read_dht_temperature() -> None:
     """
