@@ -100,14 +100,14 @@ def read_dht_temperature() -> None:
                 # Only update if values are valid
                 if temperature is not None and -40.0 < temperature < 80.0:
                     latest_temperature = round(float(temperature), 1)
-                    logging.debug(f"Updated latest_temperature: {latest_temperature}")
+                    logging.info(f"Updated latest_temperature: {latest_temperature}")
                 else:
-                    logging.debug("Temperature value not updated (None or out of range)")
+                    logging.error("Temperature value not updated (None or out of range)")
                 if humidity is not None and 0.0 <= humidity <= 100.0:
                     latest_humidity = round(float(humidity), 1)
-                    logging.debug(f"Updated latest_humidity: {latest_humidity}")
+                    logging.info(f"Updated latest_humidity: {latest_humidity}")
                 else:
-                    logging.debug("Humidity value not updated (None or out of range)")
+                    logging.error("Humidity value not updated (None or out of range)")
         except Exception as e:
             logging.error(f"Error reading DHT sensor: {e}")
         time.sleep(5)
