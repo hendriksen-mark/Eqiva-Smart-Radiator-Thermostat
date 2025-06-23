@@ -337,6 +337,17 @@ def handle_exit(signum, frame):
 signal.signal(signal.SIGTERM, handle_exit)
 signal.signal(signal.SIGINT, handle_exit)
 
+@app.route('/all', methods=['GET'])
+def get_all_status():
+    message = {}
+    message["thermostats"] = status_store
+    message["dht"] = {
+        "temperature": latest_temperature,
+        "humidity": latest_humidity
+    }
+    message["pi_temp"] = get_PI_temp()
+    return jsonify(message), 200
+
 if __name__ == '__main__':
     start_polling()
     app.run(host='0.0.0.0', port=HOST_HTTP_PORT)
