@@ -36,7 +36,7 @@ latest_humidity: Optional[float] = None
 dht_lock = Lock()
 
 sensor = Adafruit_DHT.DHT22
-DHT_PIN = 24
+DHT_PIN = None
 
 STATUS_YAML_PATH: str = os.path.join(os.path.dirname(__file__), "status_store.yaml")
 HOST_HTTP_PORT: int = 5002
@@ -91,8 +91,8 @@ def read_dht_temperature() -> None:
     and update the global variables every 5 seconds.
     If the sensor returns invalid values (None or out of range), do not update globals.
     """
-    global latest_temperature, latest_humidity
-    while True:
+    global latest_temperature, latest_humidity, DHT_PIN
+    while DHT_PIN is not None:
         try:
             humidity, temperature = Adafruit_DHT.read_retry(sensor, DHT_PIN)
             logging.debug(f"Raw DHT read: temperature={temperature}, humidity={humidity}")
@@ -112,13 +112,16 @@ def read_dht_temperature() -> None:
             logging.error(f"Error reading DHT sensor: {e}")
         time.sleep(5)
 
-@app.route('/dht', methods=['GET'])
-def get_dht() -> Any:
+@app.route('/dht/<pin>', methods=['GET'])
+def get_dht(pin: int) -> Any:
     """
     Return the latest DHT temperature and humidity.
     If values are not available, return HTTP 503.
     """
-    logging.info("Received request for DHT sensor data")
+    logging.info(f"Received request for DHT sensor data on pin {pin}")
+    global DHT_PIN
+    DHT_PIN = pin
+    read_dht_temperature()  # Start reading DHT sensor data if not already started
     global latest_temperature, latest_humidity
     with dht_lock:
         temp = latest_temperature
@@ -222,14 +225,23 @@ def start_polling() -> None:
         threading.Thread(target=read_dht_temperature, daemon=True).start()
         start_polling._started = True
 
-@app.route('/<mac>/<request_type>', defaults={'value': None}, methods=['GET'])
-@app.route('/<mac>/<request_type>/<value>', methods=['GET'])
-def handle(mac: str, request_type: str, value: Optional[str]) -> Any:
+@app.route('/<mac>/<dht_pin>/<request_type>', defaults={'value': None}, methods=['GET'])
+@app.route('/<mac>/<dht_pin>/<request_type>/<value>', methods=['GET'])
+def handle(mac: str, dht_pin: int, request_type: str, value: Optional[str]) -> Any:
     mac = format_mac(mac)
     if value is None:
         value = request.args.get("value")
+    if dht_pin is None:
+        dht_pin = request.args.get("dht_pin", type=int)
     logging.info(
-        f"Received request: mac={mac}, request_type={request_type}, value={value}")
+        f"Received request: mac={mac}, dht_pin={dht_pin}, request_type={request_type}, value={value}")
+    global DHT_PIN
+    if dht_pin is None:
+        logging.error("DHT_PIN is required but not provided.")
+        return jsonify({"error": "DHT_PIN is required"}), 400
+    if DHT_PIN is None or DHT_PIN != dht_pin:
+        logging.info(f"Setting DHT_PIN to {dht_pin}")
+        DHT_PIN = dht_pin
     if request_type == 'status':
         if mac not in status_store:
             status_store[mac] = {
