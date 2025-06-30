@@ -5,10 +5,17 @@
 # Installation & Setup Instructions - https://www.the-diy-life.com/connecting-a-pwm-fan-to-a-raspberry-pi/
 # Modified to use hardware PWM via pigpio for Noctua fans
 
+from math import e
 import pigpio # type: ignore
 import time
 import subprocess
 import atexit
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(message)s'
+)
 
 FAN_GPIO_PIN = 18  # GPIO 18 (physical pin 12) - hardware PWM capable
 FAN_PWM_FREQ = 25000  # 25kHz for Noctua fans (acceptable range: 21kHz to 28kHz)
@@ -65,10 +72,13 @@ def main():
             duty_percentage = renormalize(temp, [MIN_TEMP, MAX_TEMP], [MIN_SPEED, MAX_SPEED])
             duty_cycle = int(duty_percentage * 255 / 100)
             pi.set_PWM_dutycycle(FAN_GPIO_PIN, duty_cycle)
-            print(f"Temp: {temp:.1f}°C, Fan speed: {duty_percentage:.1f}%, Duty cycle: {duty_cycle}")
+            logging.info(f"CPU Temp: {temp:.1f}°C, Fan speed: {duty_percentage:.1f}%, Duty cycle: {duty_cycle}")
             time.sleep(5)
     except KeyboardInterrupt:
-        print("\nStopping fan...")
+        logging.info("\nStopping fan...")
+        cleanup()
+    except Exception as e:
+        logging.error(f"An error occurred: {e}")
         cleanup()
 
 if __name__ == "__main__":
