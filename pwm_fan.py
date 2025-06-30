@@ -27,10 +27,16 @@ if not pi.connected:
 pi.set_PWM_frequency(FAN_GPIO_PIN, FAN_PWM_FREQ)
 pi.set_PWM_dutycycle(FAN_GPIO_PIN, 0)
 
+# Flag to prevent double cleanup
+cleanup_done = False
+
 def cleanup():
     """Clean up GPIO resources."""
-    pi.set_PWM_dutycycle(FAN_GPIO_PIN, 0)
-    pi.stop()
+    global cleanup_done
+    if not cleanup_done and pi.connected:
+        pi.set_PWM_dutycycle(FAN_GPIO_PIN, 0)
+        pi.stop()
+        cleanup_done = True
 
 # Register cleanup function to run on exit
 atexit.register(cleanup)
