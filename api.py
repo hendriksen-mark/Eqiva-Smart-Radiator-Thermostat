@@ -1,8 +1,7 @@
 import logging
 from flask import Flask, request, jsonify
 import asyncio
-import threading
-import time
+from time import sleep
 from utils.Thermostat import Thermostat
 from utils.Temperature import Temperature
 from utils.EqivaException import EqivaException
@@ -10,7 +9,7 @@ import yaml
 import os
 from bleak import BleakError
 from typing import Dict, Any, Optional
-from threading import Lock
+from threading import Lock, Thread
 import signal
 import subprocess
 try:
@@ -43,7 +42,7 @@ HOST_HTTP_PORT: int = 5002
 
 status_store: Dict[str, Dict[str, Any]] = {}
 connected_thermostats = set()
-connected_thermostats_lock = threading.Lock()
+connected_thermostats_lock = Lock()
 
 def format_mac(mac: str) -> str:
     return mac.replace('-', ':').upper()
@@ -110,7 +109,7 @@ def read_dht_temperature() -> None:
                     logging.error("Humidity value not updated (None or out of range)")
         except Exception as e:
             logging.error(f"Error reading DHT sensor: {e}")
-        time.sleep(5)
+        sleep(5)
 
 @app.route('/dht/<pin>', methods=['GET'])
 def get_dht(pin: int) -> Any:
@@ -119,6 +118,8 @@ def get_dht(pin: int) -> Any:
     If values are not available, return HTTP 503.
     """
     logging.info(f"Received request for DHT sensor data on pin {pin}")
+    if pin is None:
+        pin = request.args.get("pin", type=int)
     global DHT_PIN
     DHT_PIN = pin
     read_dht_temperature()  # Start reading DHT sensor data if not already started
@@ -212,7 +213,7 @@ def polling_loop() -> None:
                     logging.error(
                         f"Polling failed for {mac}: {type(result).__name__}: {result}")
         save_status_store()
-        time.sleep(30)
+        sleep(30)
 
 def start_polling() -> None:
     """
@@ -221,8 +222,8 @@ def start_polling() -> None:
     """
     load_status_store()
     if not hasattr(start_polling, "_started"):
-        threading.Thread(target=polling_loop, daemon=True).start()
-        threading.Thread(target=read_dht_temperature, daemon=True).start()
+        Thread(target=polling_loop, daemon=True).start()
+        Thread(target=read_dht_temperature, daemon=True).start()
         start_polling._started = True
 
 @app.route('/<mac>/<dht_pin>/<request_type>', defaults={'value': None}, methods=['GET'])
