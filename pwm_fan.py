@@ -23,7 +23,7 @@ FAN_PWM_FREQ = 25000  # 25kHz for Noctua fans (acceptable range: 21kHz to 28kHz)
 MIN_TEMP = 25
 MAX_TEMP = 80
 MIN_SPEED = 0
-MAX_SPEED = 100
+MAX_SPEED = 255
 
 # Initialize pigpio
 pi = pigpio.pi()
@@ -68,11 +68,10 @@ def main():
         while True:
             temp = get_temp()
             temp = max(MIN_TEMP, min(MAX_TEMP, temp))
-            # Convert percentage to pigpio duty cycle (0-255)
-            duty_percentage = renormalize(temp, [MIN_TEMP, MAX_TEMP], [MIN_SPEED, MAX_SPEED])
-            duty_cycle = int(duty_percentage * 255 / 100)
+            # Convert temp to pigpio duty cycle (0-255)
+            duty_cycle = renormalize(temp, [MIN_TEMP, MAX_TEMP], [MIN_SPEED, MAX_SPEED])
             pi.set_PWM_dutycycle(FAN_GPIO_PIN, duty_cycle)
-            logging.info(f"CPU Temp: {temp:.1f}°C, Fan speed: {duty_percentage:.1f}%, Duty cycle: {duty_cycle}")
+            logging.info(f"CPU Temp: {temp:.1f}°C, Fan speed: {duty_cycle:.1f}%, Duty cycle: {duty_cycle:.1f}")
             time.sleep(5)
     except KeyboardInterrupt:
         logging.info("\nStopping fan...")
