@@ -71,7 +71,7 @@ def main():
             # Convert temp to pigpio duty cycle (0-255)
             duty_cycle = renormalize(temp, [MIN_TEMP, MAX_TEMP], [MIN_SPEED, MAX_SPEED])
             pi.set_PWM_dutycycle(FAN_GPIO_PIN, duty_cycle)
-            logging.info(f"CPU Temp: {temp:.1f}°C, Fan speed: {duty_cycle:.1f}%, Duty cycle: {duty_cycle:.1f}")
+            logging.info(f"CPU Temp: {temp:.1f}°C, Fan Duty cycle: {duty_cycle:.1f}")
             time.sleep(5)
     except KeyboardInterrupt:
         logging.info("\nStopping fan...")
