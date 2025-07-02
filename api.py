@@ -127,20 +127,37 @@ def format_mac(mac: str) -> str:
     return mac.replace('-', ':').upper()
 
 def load_status_store() -> None:
-    global status_store
+    global status_store, DHT_PIN
     if os.path.exists(STATUS_YAML_PATH):
         with open(STATUS_YAML_PATH, "r") as f:
             data = yaml.safe_load(f)
             if isinstance(data, dict):
-                status_store = data
+                # Load thermostats data
+                status_store = data.get("thermostats", {})
+                # Load DHT pin configuration
+                dht_config = data.get("dht_config", {})
+                if "pin" in dht_config and dht_config["pin"] is not None:
+                    DHT_PIN = int(dht_config["pin"])
+                    logging.info(f"Loaded DHT_PIN from config: {DHT_PIN}")
+                else:
+                    DHT_PIN = None
             else:
                 status_store = {}
+                DHT_PIN = None
     else:
         status_store = {}
+        DHT_PIN = None
 
 def save_status_store() -> None:
+    data = {
+        "thermostats": status_store,
+        "dht_config": {
+            "pin": DHT_PIN,
+            "last_updated": None if DHT_PIN is None else "auto"
+        }
+    }
     with open(STATUS_YAML_PATH, "w") as f:
-        yaml.safe_dump(status_store, f)
+        yaml.safe_dump(data, f)
 
 def get_PI_temp():
     """Read the CPU temperature and return it as a float in degrees Celsius."""
@@ -148,7 +165,7 @@ def get_PI_temp():
         output = subprocess.run(['vcgencmd', 'measure_temp'], capture_output=True, check=True)
         temp_str = output.stdout.decode()
         return float(temp_str.split('=')[1].split('\'')[0])
-    except (IndexError, ValueError, subprocess.CalledProcessError):
+    except (IndexError, ValueError, subprocess.CalledProcessError, FileNotFoundError):
         raise RuntimeError('Could not get temperature')
 
 @app.route('/pi_temp', methods=['GET'])
@@ -208,8 +225,10 @@ def get_dht(pin: int = None) -> Any:
     if pin is not None and DHT_PIN != pin:
         logging.info(f"Setting DHT_PIN to {pin}")
         DHT_PIN = pin
-        # Start reading DHT sensor data if not already started
-        read_dht_temperature()
+        # Save the updated configuration
+        save_status_store()
+        # Ensure DHT reading thread is started
+        ensure_dht_thread_running()
     
     # If no pin is set at all, return default values
     if DHT_PIN is None:
@@ -319,15 +338,33 @@ def start_polling() -> None:
     load_status_store()
     if not hasattr(start_polling, "_started"):
         Thread(target=polling_loop, daemon=True).start()
-        Thread(target=read_dht_temperature, daemon=True).start()
         start_polling._started = True
+        logging.info("Started thermostat polling thread")
+    
+    # Start DHT thread if pin is configured in the loaded config
+    if DHT_PIN is not None:
+        ensure_dht_thread_running()
+        logging.info(f"DHT sensor configured on pin {DHT_PIN} - starting reading thread")
 
 def update_dht_pin(dht_pin: Optional[int]) -> None:
-    """Update DHT pin if provided"""
+    """Update DHT pin if provided and ensure DHT reading is active"""
     global DHT_PIN
     if dht_pin is not None and DHT_PIN != dht_pin:
         logging.info(f"Setting DHT_PIN to {dht_pin}")
         DHT_PIN = dht_pin
+        # Save the updated configuration
+        save_status_store()
+        # Ensure DHT reading thread is started
+        ensure_dht_thread_running()
+
+def ensure_dht_thread_running() -> None:
+    """Ensure DHT reading thread is running if DHT_PIN is set"""
+    global DHT_PIN
+    if DHT_PIN is not None:
+        if not hasattr(ensure_dht_thread_running, "_dht_thread_started"):
+            Thread(target=read_dht_temperature, daemon=True).start()
+            ensure_dht_thread_running._dht_thread_started = True
+            logging.info(f"Started DHT reading thread for pin {DHT_PIN}")
 
 # HomeKit/Homebridge compatible routes
 @app.route('/<mac>/<dht_pin>/status', methods=['GET'])
@@ -444,8 +481,10 @@ def get_all_status():
     message = {}
     message["thermostats"] = status_store
     message["dht"] = {
+        "pin": DHT_PIN,
         "temperature": latest_temperature,
-        "humidity": latest_humidity
+        "humidity": latest_humidity,
+        "active": DHT_PIN is not None
     }
     try:
         message["pi_temp"] = get_PI_temp()
