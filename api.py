@@ -194,13 +194,15 @@ def read_dht_temperature() -> None:
             with dht_lock:
                 # Only update if values are valid
                 if temperature is not None and Config.MIN_DHT_TEMP < temperature < Config.MAX_DHT_TEMP:
-                    latest_temperature = round(float(temperature), 1)
-                    logging.info(f"Updated latest_temperature: {latest_temperature}")
+                    if latest_temperature is None or latest_temperature != temperature:
+                        latest_temperature = round(float(temperature), 1)
+                        logging.info(f"Updated temperature: {latest_temperature}")
                 else:
                     logging.error("Temperature value not updated (None or out of range)")
                 if humidity is not None and Config.MIN_HUMIDITY <= humidity <= Config.MAX_HUMIDITY:
-                    latest_humidity = round(float(humidity), 1)
-                    logging.info(f"Updated latest_humidity: {latest_humidity}")
+                    if latest_humidity is None or latest_humidity != humidity:
+                        latest_humidity = round(float(humidity), 1)
+                        logging.info(f"Updated humidity: {latest_humidity}")
                 else:
                     logging.error("Humidity value not updated (None or out of range)")
         except Exception as e:
@@ -238,9 +240,7 @@ def get_dht(pin: int = None) -> Any:
             "humidity": 50.0,     # Default humidity
             "warning": "DHT sensor not configured"
         }), 200
-    
-    logging.info(f"Received request for DHT sensor data on pin {DHT_PIN}")
-    
+
     # Get current sensor values
     global latest_temperature, latest_humidity
     with dht_lock:
@@ -248,12 +248,14 @@ def get_dht(pin: int = None) -> Any:
         hum = latest_humidity
     
     if temp is None or hum is None:
-        logging.error("DHT sensor data not available, returning default values")
+        logging.warning("DHT sensor data not available, returning default values")
         return jsonify({
             "temperature": 22.0,  # Default temperature
             "humidity": 50.0,     # Default humidity
             "warning": "DHT sensor data not available"
         }), 200
+    
+    logging.debug(f"Returning DHT data: temperature={temp}, humidity={hum}, pin={DHT_PIN}")
     
     return jsonify({
         "temperature": temp,
@@ -275,13 +277,13 @@ async def safe_disconnect(thermostat: Thermostat) -> None:
         connected_thermostats.discard(thermostat)
 
 async def poll_status(mac: str) -> None:
-    logging.info(f"Polling: Attempting to connect to {mac}")
+    logging.debug(f"Polling: Attempting to connect to {mac}")
     thermostat = Thermostat(mac)
     try:
         await safe_connect(thermostat)
-        logging.info(f"Polling: Connected to {mac}")
+        logging.debug(f"Polling: Connected to {mac}")
         await thermostat.requestStatus()
-        logging.info(f"Polling: Status requested from {mac}")
+        logging.debug(f"Polling: Status requested from {mac}")
         mode = thermostat.mode.to_dict()
         valve = thermostat.valve
         temp = thermostat.temperature.valueC
@@ -293,15 +295,20 @@ async def poll_status(mac: str) -> None:
 
         mode_status = calculate_heating_cooling_state(mode, valve)
 
-        status_store[mac] = {
+        new_status = {
             "targetHeatingCoolingState": 3 if 'AUTO' in mode else (1 if 'MANUAL' in mode else 0),
             "targetTemperature": temp,
             "currentHeatingCoolingState": mode_status,
             "currentTemperature": current_temp,
             "currentRelativeHumidity": current_hum
         }
-        logging.info(
-            f"Polling: Updated status_store for {mac}: {status_store[mac]}")
+        
+        # Only update and log if the status has changed
+        if mac not in status_store or status_store[mac] != new_status:
+            status_store[mac] = new_status
+            logging.info(f"Polling: Status changed for {mac}: {status_store[mac]}")
+        else:
+            logging.debug(f"Polling: No status change for {mac}, skipping update")
     except BleakError as e:
         logging.error(f"Polling: BLE error for {mac}: {e}")
         raise
@@ -311,7 +318,7 @@ async def poll_status(mac: str) -> None:
     finally:
         try:
             await safe_disconnect(thermostat)
-            logging.info(f"Polling: Disconnected from {mac}")
+            logging.debug(f"Polling: Disconnected from {mac}")
         except Exception as e:
             logging.error(f"Polling: Error disconnecting from {mac}: {e}")
 
@@ -321,9 +328,9 @@ def polling_loop() -> None:
     while True:
         load_status_store()
         macs_to_poll = list(status_store.keys())
-        logging.info(f"Polling MACs: {macs_to_poll}")
+        logging.debug(f"Polling MACs: {macs_to_poll}")
         if not macs_to_poll:
-            logging.info("Polling: No MACs to poll, sleeping.")
+            logging.debug("Polling: No MACs to poll, sleeping.")
         tasks = [poll_status(mac) for mac in macs_to_poll]
         if tasks:
             results = loop.run_until_complete(
