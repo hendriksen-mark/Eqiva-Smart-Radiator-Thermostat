@@ -194,13 +194,13 @@ def read_dht_temperature() -> None:
             with dht_lock:
                 # Only update if values are valid
                 if temperature is not None and Config.MIN_DHT_TEMP < temperature < Config.MAX_DHT_TEMP:
-                    if latest_temperature is None or latest_temperature != temperature:
+                    if latest_temperature is None or latest_temperature != round(float(temperature), 1):
                         latest_temperature = round(float(temperature), 1)
                         logging.info(f"Updated temperature: {latest_temperature}")
                 else:
                     logging.error("Temperature value not updated (None or out of range)")
                 if humidity is not None and Config.MIN_HUMIDITY <= humidity <= Config.MAX_HUMIDITY:
-                    if latest_humidity is None or latest_humidity != humidity:
+                    if latest_humidity is None or latest_humidity != round(float(humidity), 1):
                         latest_humidity = round(float(humidity), 1)
                         logging.info(f"Updated humidity: {latest_humidity}")
                 else:
