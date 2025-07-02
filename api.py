@@ -326,7 +326,6 @@ def polling_loop() -> None:
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     while True:
-        load_status_store()
         macs_to_poll = list(status_store.keys())
         logging.debug(f"Polling MACs: {macs_to_poll}")
         if not macs_to_poll:
