@@ -594,11 +594,11 @@ def api_documentation() -> Any:
 # Request logging middleware
 @app.before_request
 def log_request_info():
-    logging.info(f"Request: {request.method} {request.url} from {request.remote_addr}")
+    logging.debug(f"Request: {request.method} {request.url} from {request.remote_addr}")
 
 @app.after_request
 def log_response_info(response):
-    logging.info(f"Response: {response.status_code} for {request.method} {request.url}")
+    logging.debug(f"Response: {response.status_code} for {request.method} {request.url}")
     # Add CORS headers
     response.headers.add('Access-Control-Allow-Origin', '*')
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
