@@ -8,10 +8,13 @@ from utils.EqivaException import EqivaException
 import yaml
 import os
 from bleak import BleakError
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union
 from threading import Lock, Thread
 import signal
 import subprocess
+from dataclasses import dataclass
+from functools import wraps
+
 try:
     import Adafruit_DHT  # type: ignore
 except ImportError:
@@ -23,10 +26,86 @@ except ImportError:
             return 22.0, 50.0
     Adafruit_DHT = DummyDHT()
 
+# Configuration management
+class Config:
+    """Application configuration"""
+    HOST_HTTP_PORT = int(os.getenv('HOST_HTTP_PORT', 5002))
+    STATUS_YAML_PATH = os.path.join(os.path.dirname(__file__), "status_store.yaml")
+    POLLING_INTERVAL = int(os.getenv('POLLING_INTERVAL', 30))
+    DHT_READ_INTERVAL = int(os.getenv('DHT_READ_INTERVAL', 5))
+    LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
+    
+    # Temperature validation ranges
+    MIN_TEMPERATURE = 5.0
+    MAX_TEMPERATURE = 30.0
+    
+    # DHT sensor validation ranges
+    MIN_DHT_TEMP = -40.0
+    MAX_DHT_TEMP = 80.0
+    MIN_HUMIDITY = 0.0
+    MAX_HUMIDITY = 100.0
+
+# Update logging configuration
 logging.basicConfig(
-    level=logging.INFO,
+    level=getattr(logging, Config.LOG_LEVEL),
     format='%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(message)s'
 )
+
+class ThermostatStatus:
+    """Data class for thermostat status"""
+    def __init__(self, target_heating_cooling_state: int, target_temperature: float,
+                 current_heating_cooling_state: int, current_temperature: float,
+                 current_relative_humidity: float):
+        self.target_heating_cooling_state = target_heating_cooling_state
+        self.target_temperature = target_temperature
+        self.current_heating_cooling_state = current_heating_cooling_state
+        self.current_temperature = current_temperature
+        self.current_relative_humidity = current_relative_humidity
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "targetHeatingCoolingState": self.target_heating_cooling_state,
+            "targetTemperature": self.target_temperature,
+            "currentHeatingCoolingState": self.current_heating_cooling_state,
+            "currentTemperature": self.current_temperature,
+            "currentRelativeHumidity": self.current_relative_humidity
+        }
+
+def async_route(f):
+    """Decorator to handle async functions in Flask routes"""
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            return loop.run_until_complete(f(*args, **kwargs))
+        finally:
+            loop.close()
+    return wrapper
+
+def validate_mac_address(mac: str) -> bool:
+    """Validate MAC address format"""
+    if not mac:
+        return False
+    formatted_mac = format_mac(mac)
+    # Basic MAC validation - should be 6 groups of 2 hex digits
+    parts = formatted_mac.split(':')
+    if len(parts) != 6:
+        return False
+    for part in parts:
+        if len(part) != 2 or not all(c in '0123456789ABCDEF' for c in part):
+            return False
+    return True
+
+def create_default_thermostat_status() -> Dict[str, Any]:
+    """Create default thermostat status"""
+    return ThermostatStatus(
+        target_heating_cooling_state=0,
+        target_temperature=20.0,
+        current_heating_cooling_state=0,
+        current_temperature=20.0,
+        current_relative_humidity=50.0
+    ).to_dict()
 
 app = Flask(__name__)
 
@@ -37,8 +116,8 @@ dht_lock = Lock()
 sensor = Adafruit_DHT.DHT22
 DHT_PIN = None
 
-STATUS_YAML_PATH: str = os.path.join(os.path.dirname(__file__), "status_store.yaml")
-HOST_HTTP_PORT: int = 5002
+STATUS_YAML_PATH: str = Config.STATUS_YAML_PATH
+HOST_HTTP_PORT: int = Config.HOST_HTTP_PORT
 
 status_store: Dict[str, Dict[str, Any]] = {}
 connected_thermostats = set()
@@ -97,42 +176,66 @@ def read_dht_temperature() -> None:
             logging.debug(f"Raw DHT read: temperature={temperature}, humidity={humidity}")
             with dht_lock:
                 # Only update if values are valid
-                if temperature is not None and -40.0 < temperature < 80.0:
+                if temperature is not None and Config.MIN_DHT_TEMP < temperature < Config.MAX_DHT_TEMP:
                     latest_temperature = round(float(temperature), 1)
                     logging.info(f"Updated latest_temperature: {latest_temperature}")
                 else:
                     logging.error("Temperature value not updated (None or out of range)")
-                if humidity is not None and 0.0 <= humidity <= 100.0:
+                if humidity is not None and Config.MIN_HUMIDITY <= humidity <= Config.MAX_HUMIDITY:
                     latest_humidity = round(float(humidity), 1)
                     logging.info(f"Updated latest_humidity: {latest_humidity}")
                 else:
                     logging.error("Humidity value not updated (None or out of range)")
         except Exception as e:
             logging.error(f"Error reading DHT sensor: {e}")
-        sleep(5)
+        sleep(Config.DHT_READ_INTERVAL)
 
 @app.route('/dht/<pin>', methods=['GET'])
-def get_dht(pin: int) -> Any:
+@app.route('/dht', methods=['GET'])
+def get_dht(pin: int = None) -> Any:
     """
     Return the latest DHT temperature and humidity.
+    If pin is provided, set the DHT pin. If not, use current pin.
     If values are not available, return HTTP 503.
     """
-    logging.info(f"Received request for DHT sensor data on pin {pin}")
+    global DHT_PIN
+    
+    # Handle pin parameter - from URL path or query parameter
     if pin is None:
         pin = request.args.get("pin", type=int)
-    global DHT_PIN
-    DHT_PIN = pin
-    read_dht_temperature()  # Start reading DHT sensor data if not already started
+    
+    # If pin is provided and different from current, update it
+    if pin is not None and DHT_PIN != pin:
+        logging.info(f"Setting DHT_PIN to {pin}")
+        DHT_PIN = pin
+        # Start reading DHT sensor data if not already started
+        read_dht_temperature()
+    
+    # If no pin is set at all, return default values
+    if DHT_PIN is None:
+        logging.warning("DHT_PIN is not set, returning default values.")
+        return jsonify({
+            "temperature": 22.0,  # Default temperature
+            "humidity": 50.0,     # Default humidity
+            "warning": "DHT sensor not configured"
+        }), 200
+    
+    logging.info(f"Received request for DHT sensor data on pin {DHT_PIN}")
+    
+    # Get current sensor values
     global latest_temperature, latest_humidity
     with dht_lock:
         temp = latest_temperature
         hum = latest_humidity
+    
     if temp is None or hum is None:
         return jsonify({"error": "DHT sensor data not available"}), 503
+    
     return jsonify({
         "temperature": temp,
-        "humidity": hum
-    })
+        "humidity": hum,
+        "pin": DHT_PIN
+    }), 200
 
 async def safe_connect(thermostat: Thermostat) -> None:
     await thermostat.connect()
@@ -164,14 +267,7 @@ async def poll_status(mac: str) -> None:
             current_temp = latest_temperature if latest_temperature is not None else temp
             current_hum = latest_humidity if latest_humidity is not None else 50.0
 
-        if 'OFF' in mode:
-            mode_status = 0
-        elif valve and valve > 0 and 'MANUAL' in mode:
-            mode_status = 1
-        elif valve == 0 and 'MANUAL' in mode:
-            mode_status = 2
-        else:
-            mode_status = 3 if 'AUTO' in mode else 1
+        mode_status = calculate_heating_cooling_state(mode, valve)
 
         status_store[mac] = {
             "targetHeatingCoolingState": 3 if 'AUTO' in mode else (1 if 'MANUAL' in mode else 0),
@@ -213,7 +309,7 @@ def polling_loop() -> None:
                     logging.error(
                         f"Polling failed for {mac}: {type(result).__name__}: {result}")
         save_status_store()
-        sleep(30)
+        sleep(Config.POLLING_INTERVAL)
 
 def start_polling() -> None:
     """
@@ -226,62 +322,245 @@ def start_polling() -> None:
         Thread(target=read_dht_temperature, daemon=True).start()
         start_polling._started = True
 
-@app.route('/<mac>/<dht_pin>/<request_type>', defaults={'value': None}, methods=['GET'])
-@app.route('/<mac>/<dht_pin>/<request_type>/<value>', methods=['GET'])
-def handle(mac: str, dht_pin: int, request_type: str, value: Optional[str]) -> Any:
-    mac = format_mac(mac)
-    if value is None:
-        value = request.args.get("value")
-    if dht_pin is None:
-        dht_pin = request.args.get("dht_pin", type=int)
-    logging.info(
-        f"Received request: mac={mac}, dht_pin={dht_pin}, request_type={request_type}, value={value}")
+def update_dht_pin(dht_pin: Optional[int]) -> None:
+    """Update DHT pin if provided"""
     global DHT_PIN
-    if dht_pin is None:
-        logging.error("DHT_PIN is required but not provided.")
-        return jsonify({"error": "DHT_PIN is required"}), 400
-    if DHT_PIN is None or DHT_PIN != dht_pin:
+    if dht_pin is not None and DHT_PIN != dht_pin:
         logging.info(f"Setting DHT_PIN to {dht_pin}")
         DHT_PIN = dht_pin
-    if request_type == 'status':
-        if mac not in status_store:
-            status_store[mac] = {
-                "targetHeatingCoolingState": 0,
-                "targetTemperature": 20.0,
-                "currentHeatingCoolingState": 0,
-                "currentTemperature": 20.0,
-                "currentRelativeHumidity": 50.0
-            }
-            save_status_store()
-            logging.info(f"MAC {mac} not found, returning default values.")
-        return jsonify(status_store[mac])
-    elif request_type == 'targetTemperature' and value:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            result = loop.run_until_complete(set_temperature(mac, value))
-        except BleakError:
-            logging.error(f"Device with address {mac} was not found")
-            return jsonify({"result": "error", "message": f"Device with address {mac} was not found"}), 404
-        logging.info(f"Set targetTemperature for {mac} to {value}: {result}")
-        return jsonify(result)
-    elif request_type == 'targetHeatingCoolingState' and value:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            result = loop.run_until_complete(set_mode(mac, value))
-        except BleakError:
-            logging.error(f"Device with address {mac} was not found")
-            return jsonify({"result": "error", "message": f"Device with address {mac} was not found"}), 404
-        logging.info(
-            f"Set targetHeatingCoolingState for {mac} to {value}: {result}")
-        return jsonify(result)
-    else:
-        logging.error(
-            f"Invalid request: mac={mac}, request_type={request_type}, value={value}")
-        return jsonify({"error": "Invalid request"}), 400
 
+# HomeKit/Homebridge compatible routes
+@app.route('/<mac>/<dht_pin>/status', methods=['GET'])
+def get_homekit_status(mac: str, dht_pin: int) -> Any:
+    """
+    Get thermostat status in HomeKit format
+    URL: /MAC_ADDRESS/DHT_PIN/status
+    """
+    if not validate_mac_address(mac):
+        return jsonify({"error": "Invalid MAC address format"}), 400
+    
+    mac = format_mac(mac)
+    update_dht_pin(int(dht_pin) if dht_pin else None)
+    
+    if mac not in status_store:
+        status_store[mac] = create_default_thermostat_status()
+        save_status_store()
+        logging.info(f"MAC {mac} not found, created default status.")
+    
+    # Return HomeKit compatible format
+    response = {
+        "targetHeatingCoolingState": status_store[mac]["targetHeatingCoolingState"],
+        "targetTemperature": status_store[mac]["targetTemperature"],
+        "currentHeatingCoolingState": status_store[mac]["currentHeatingCoolingState"],
+        "currentTemperature": status_store[mac]["currentTemperature"]
+    }
+    
+    # Add humidity if available
+    if status_store[mac].get("currentRelativeHumidity") is not None:
+        response["currentRelativeHumidity"] = status_store[mac]["currentRelativeHumidity"]
+    
+    logging.info(f"Returning status for {mac}: {response}")
+    return jsonify(response), 200
+
+@app.route('/<mac>/<dht_pin>/targetTemperature', methods=['GET'])
+@async_route
+async def set_homekit_target_temperature(mac: str, dht_pin: int) -> Any:
+    """
+    Set target temperature via HomeKit format
+    URL: /MAC_ADDRESS/DHT_PIN/targetTemperature?value=FLOAT_VALUE
+    """
+    if not validate_mac_address(mac):
+        return jsonify({"error": "Invalid MAC address format"}), 400
+    
+    mac = format_mac(mac)
+    update_dht_pin(int(dht_pin) if dht_pin else None)
+    
+    # Get temperature value from query parameter
+    temp_value = request.args.get('value')
+    if not temp_value:
+        return jsonify({"error": "Temperature value is required as 'value' parameter"}), 400
+    
+    try:
+        temperature = float(temp_value)
+        if not (Config.MIN_TEMPERATURE <= temperature <= Config.MAX_TEMPERATURE):
+            return jsonify({
+                "error": f"Temperature must be between {Config.MIN_TEMPERATURE}°C and {Config.MAX_TEMPERATURE}°C"
+            }), 400
+    except ValueError:
+        return jsonify({"error": "Invalid temperature value"}), 400
+    
+    try:
+        result = await set_temperature(mac, str(temperature))
+        logging.info(f"HomeKit: Set targetTemperature for {mac} to {temperature}: {result}")
+        
+        if result["result"] == "ok":
+            return jsonify({"success": True, "temperature": temperature}), 200
+        else:
+            return jsonify(result), 400
+            
+    except BleakError:
+        logging.error(f"Device with address {mac} was not found")
+        return jsonify({"error": f"Device with address {mac} was not found"}), 404
+
+@app.route('/<mac>/<dht_pin>/targetHeatingCoolingState', methods=['GET'])
+@async_route
+async def set_homekit_target_heating_cooling_state(mac: str, dht_pin: int) -> Any:
+    """
+    Set target heating/cooling state via HomeKit format
+    URL: /MAC_ADDRESS/DHT_PIN/targetHeatingCoolingState?value=INT_VALUE
+    """
+    if not validate_mac_address(mac):
+        return jsonify({"error": "Invalid MAC address format"}), 400
+    
+    mac = format_mac(mac)
+    update_dht_pin(int(dht_pin) if dht_pin else None)
+    
+    # Get mode value from query parameter
+    mode_value = request.args.get('value')
+    if not mode_value:
+        return jsonify({"error": "Mode value is required as 'value' parameter"}), 400
+    
+    if mode_value not in ['0', '1', '2', '3']:
+        return jsonify({"error": "Mode must be 0 (off), 1 (heat), 2 (cool), or 3 (auto)"}), 400
+    
+    try:
+        result = await set_mode(mac, mode_value)
+        logging.info(f"HomeKit: Set targetHeatingCoolingState for {mac} to {mode_value}: {result}")
+        
+        if result["result"] == "ok":
+            return jsonify({"success": True, "mode": int(mode_value)}), 200
+        else:
+            return jsonify(result), 400
+            
+    except BleakError:
+        logging.error(f"Device with address {mac} was not found")
+        return jsonify({"error": f"Device with address {mac} was not found"}), 404
+
+@app.route('/all', methods=['GET'])
+def get_all_status():
+    """
+    Get the status of all thermostats and DHT sensor.
+    """
+    message = {}
+    message["thermostats"] = status_store
+    message["dht"] = {
+        "temperature": latest_temperature,
+        "humidity": latest_humidity
+    }
+    try:
+        message["pi_temp"] = get_PI_temp()
+    except RuntimeError:
+        message["pi_temp"] = None
+    return jsonify(message), 200
+
+# Health check endpoint
+@app.route('/health', methods=['GET'])
+def health_check() -> Any:
+    """Health check endpoint"""
+    return jsonify({
+        "status": "healthy",
+        "version": "1.0.0",
+        "thermostats_connected": len(status_store),
+        "dht_sensor_active": DHT_PIN is not None,
+        "temperature_available": latest_temperature is not None,
+        "humidity_available": latest_humidity is not None
+    }), 200
+
+# API documentation endpoint
+@app.route('/api', methods=['GET'])
+def api_documentation() -> Any:
+    """API documentation"""
+    return jsonify({
+        "api_version": "1.0.0",
+        "description": "Eqiva Smart Radiator Thermostat API - HomeKit Compatible",
+        "base_url_example": "http://192.168.1.15:5002/00-1A-22-16-3D-E7/25",
+        "url_format": "/{mac_address}/{dht_pin}/{endpoint}",
+        "homekit_endpoints": {
+            "/{mac}/{dht_pin}/status": {
+                "method": "GET",
+                "description": "Get thermostat status in HomeKit format",
+                "response": {
+                    "targetHeatingCoolingState": "INT (0=off, 1=heat, 2=cool, 3=auto)",
+                    "targetTemperature": "FLOAT",
+                    "currentHeatingCoolingState": "INT",
+                    "currentTemperature": "FLOAT",
+                    "currentRelativeHumidity": "FLOAT (optional)"
+                }
+            },
+            "/{mac}/{dht_pin}/targetTemperature": {
+                "method": "GET",
+                "description": "Set target temperature",
+                "parameters": {
+                    "value": "FLOAT_VALUE (query parameter)"
+                },
+                "example": "/00-1A-22-16-3D-E7/25/targetTemperature?value=22.5"
+            },
+            "/{mac}/{dht_pin}/targetHeatingCoolingState": {
+                "method": "GET",
+                "description": "Set heating/cooling state",
+                "parameters": {
+                    "value": "INT_VALUE (0=off, 1=heat, 2=cool, 3=auto)"
+                },
+                "example": "/00-1A-22-16-3D-E7/25/targetHeatingCoolingState?value=3"
+            }
+        },
+        "other_endpoints": {
+            "/health": {
+                "method": "GET",
+                "description": "Health check"
+            },
+            "/dht": {
+                "method": "GET",
+                "description": "Get DHT sensor data (current pin)"
+            },
+            "/dht/<pin>": {
+                "method": "GET",
+                "description": "Get DHT sensor data and optionally set pin",
+                "parameters": {
+                    "pin": "GPIO pin number (optional)"
+                },
+                "response": {
+                    "temperature": "FLOAT",
+                    "humidity": "FLOAT", 
+                    "pin": "INT (current pin)"
+                }
+            },
+            "/pi_temp": {
+                "method": "GET", 
+                "description": "Get Raspberry Pi CPU temperature"
+            },
+            "/all": {
+                "method": "GET",
+                "description": "Get all system status"
+            }
+        },
+        "mac_format": "MAC address can use either : or - as separator (e.g., 00:1A:22:16:3D:E7 or 00-1A-22-16-3D-E7)",
+        "temperature_range": f"{Config.MIN_TEMPERATURE}°C to {Config.MAX_TEMPERATURE}°C"
+    }), 200
+
+# Request logging middleware
+@app.before_request
+def log_request_info():
+    logging.info(f"Request: {request.method} {request.url} from {request.remote_addr}")
+
+@app.after_request
+def log_response_info(response):
+    logging.info(f"Response: {response.status_code} for {request.method} {request.url}")
+    # Add CORS headers
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    return response
+
+@app.route('/api', methods=['OPTIONS'])
+@app.route('/api/thermostats/<path:path>', methods=['OPTIONS'])
+def handle_options(path=None):
+    """Handle CORS preflight requests"""
+    return '', 200
+
+# Async thermostat operations
 async def set_temperature(mac: str, temp: str) -> Dict[str, Any]:
+    """Set thermostat target temperature"""
     thermostat = Thermostat(mac)
     try:
         logging.info(f"Set temperature for {mac} to {temp}")
@@ -289,13 +568,16 @@ async def set_temperature(mac: str, temp: str) -> Dict[str, Any]:
         await thermostat.setTemperature(temperature=Temperature(valueC=float(temp)))
         status_store[mac]["targetTemperature"] = float(temp)
         save_status_store()
-        return {"result": "ok"}
+        return {"result": "ok", "temperature": float(temp)}
     except BleakError:
         logging.error(f"Device with address {mac} was not found")
         return {"result": "error", "message": f"Device with address {mac} was not found"}
     except EqivaException as ex:
         logging.error(f"EqivaException for {mac}: {str(ex)}")
         return {"result": "error", "message": str(ex)}
+    except ValueError as ex:
+        logging.error(f"Invalid temperature value for {mac}: {str(ex)}")
+        return {"result": "error", "message": "Invalid temperature value"}
     finally:
         try:
             await safe_disconnect(thermostat)
@@ -303,6 +585,7 @@ async def set_temperature(mac: str, temp: str) -> Dict[str, Any]:
             logging.error(f"Error disconnecting from {mac}: {e}")
 
 async def set_mode(mac: str, mode: str) -> Dict[str, Any]:
+    """Set thermostat heating/cooling mode"""
     thermostat = Thermostat(mac)
     try:
         await safe_connect(thermostat)
@@ -312,10 +595,13 @@ async def set_mode(mac: str, mode: str) -> Dict[str, Any]:
             await thermostat.setModeManual()
         elif mode == '3':
             await thermostat.setModeAuto()
+        else:
+            return {"result": "error", "message": "Invalid mode value"}
+            
         status_store[mac]["targetHeatingCoolingState"] = 3 if mode == '3' else (1 if mode in ('1', '2') else 0)
         save_status_store()
         logging.info(f"Set mode for {mac} to {mode}")
-        return {"result": "ok"}
+        return {"result": "ok", "mode": int(mode)}
     except BleakError:
         logging.error(f"Device with address {mac} was not found")
         return {"result": "error", "message": f"Device with address {mac} was not found"}
@@ -327,6 +613,33 @@ async def set_mode(mac: str, mode: str) -> Dict[str, Any]:
             await safe_disconnect(thermostat)
         except Exception as e:
             logging.error(f"Error disconnecting from {mac}: {e}")
+
+# Improved status calculation
+def calculate_heating_cooling_state(mode: Dict[str, Any], valve: Optional[int]) -> int:
+    """Calculate the current heating/cooling state based on mode and valve position"""
+    if 'OFF' in mode:
+        return 0  # Off
+    elif valve and valve > 0 and 'MANUAL' in mode:
+        return 1  # Heating
+    elif valve == 0 and 'MANUAL' in mode:
+        return 2  # Not actively heating but in manual mode
+    elif 'AUTO' in mode:
+        return 3  # Auto mode
+    else:
+        return 1  # Default to heating for manual mode
+
+# Error handlers
+@app.errorhandler(400)
+def bad_request(error):
+    return jsonify({"error": "Bad request", "message": str(error)}), 400
+
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({"error": "Not found", "message": str(error)}), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    return jsonify({"error": "Internal server error"}), 500
 
 def cleanup_thermostats():
     logging.info("Cleanup: Disconnecting all thermostats before exit...")
@@ -350,17 +663,15 @@ def handle_exit(signum, frame):
 signal.signal(signal.SIGTERM, handle_exit)
 signal.signal(signal.SIGINT, handle_exit)
 
-@app.route('/all', methods=['GET'])
-def get_all_status():
-    message = {}
-    message["thermostats"] = status_store
-    message["dht"] = {
-        "temperature": latest_temperature,
-        "humidity": latest_humidity
-    }
-    message["pi_temp"] = get_PI_temp()
-    return jsonify(message), 200
-
 if __name__ == '__main__':
     start_polling()
     app.run(host='0.0.0.0', port=HOST_HTTP_PORT)
+
+# Legacy route redirects
+@app.route('/status', methods=['GET'])
+def legacy_status_redirect():
+    """Redirect legacy /status to /all"""
+    from flask import redirect, url_for
+    return redirect(url_for('get_all_status'))
+
+# Backward compatibility: Keep old thermostat routes but mark as deprecated
