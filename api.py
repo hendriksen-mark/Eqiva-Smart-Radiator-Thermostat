@@ -511,19 +511,21 @@ def api_documentation() -> Any:
             },
             "/dht": {
                 "method": "GET",
-                "description": "Get DHT sensor data (current pin)"
+                "description": "Get DHT sensor data (current pin)",
+                "example": "/dht"
             },
-            "/dht/<pin>": {
+            "/dht/{pin}": {
                 "method": "GET",
                 "description": "Get DHT sensor data and optionally set pin",
                 "parameters": {
-                    "pin": "GPIO pin number (optional)"
+                    "pin": "GPIO pin number"
                 },
                 "response": {
                     "temperature": "FLOAT",
                     "humidity": "FLOAT", 
                     "pin": "INT (current pin)"
-                }
+                },
+                "example": "/dht/25"
             },
             "/pi_temp": {
                 "method": "GET", 
