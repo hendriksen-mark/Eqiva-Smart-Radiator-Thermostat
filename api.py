@@ -248,7 +248,12 @@ def get_dht(pin: int = None) -> Any:
         hum = latest_humidity
     
     if temp is None or hum is None:
-        return jsonify({"error": "DHT sensor data not available"}), 503
+        logging.error("DHT sensor data not available, returning default values")
+        return jsonify({
+            "temperature": 22.0,  # Default temperature
+            "humidity": 50.0,     # Default humidity
+            "warning": "DHT sensor data not available"
+        }), 200
     
     return jsonify({
         "temperature": temp,
