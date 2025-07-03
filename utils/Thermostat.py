@@ -3,7 +3,6 @@ import asyncio
 from bleak import BleakClient
 
 from utils.Listener import Listener
-from utils.MyLogger import MyLogger
 from utils.Program import Program
 from utils.Temperature import Temperature
 from utils.Vacation import Vacation
@@ -11,7 +10,9 @@ from utils.Mode import Mode
 from utils.OpenWindowConfig import OpenWindowConfig
 from utils.EqivaException import EqivaException
 
-LOGGER = MyLogger()
+import logManager
+
+LOGGER = logManager.logger.get_logger(__name__)
 
 class Thermostat(BleakClient, Listener):
 
@@ -72,14 +73,14 @@ class Thermostat(BleakClient, Listener):
     def onNotify(self, device, bytes):
 
         LOGGER.debug(f"<<< {device.address}: received notification("
-                     f"{MyLogger.hexstr(bytes)})")
+                     f"{logManager.logger.hexstr(bytes)})")
 
         if bytes.startswith(Thermostat.NOTIFY_SERIAL):
 
             self.serialNumber = bytearray(
                 [b - 0x30 for b in bytes[4:-1]]).decode()
             self.firmware = bytes[1] / 100
-            LOGGER.info(f"{device.address}: received serialNo and firmware version: "
+            LOGGER.debug(f"{device.address}: received serialNo and firmware version: "
                         f"{self.serialNumber}, {self.firmware}")
 
         elif bytes.startswith(Thermostat.NOTIFY_STATUS):
@@ -106,7 +107,7 @@ class Thermostat(BleakClient, Listener):
                 LOGGER.debug(
                     f"{device.address}: outdated firmware detected.")
 
-            LOGGER.info(f"{device.address}: received status: mode={str(self.mode)}, temperature={str(self.temperature)}, valve={str(self.valve)}%, vacation={str(self.vacation)}, openWindowConfig="
+            LOGGER.debug(f"{device.address}: received status: mode={str(self.mode)}, temperature={str(self.temperature)}, valve={str(self.valve)}%, vacation={str(self.vacation)}, openWindowConfig="
                         f"{str(self.openWindowConfig)}, comfortTemperature={str(self.comfortTemperature)}, ecoTemperature={str(self.ecoTemperature)}, offsetTemperature={str(self.offsetTemperature)}")
 
         elif bytes.startswith(Thermostat.NOTIFY_PROGRAM_REQUEST):
@@ -114,12 +115,12 @@ class Thermostat(BleakClient, Listener):
             day = bytes[1]
             program = Program.fromBytes(bytes=bytes[2:])
             self.programs[day] = program
-            LOGGER.info(f"{device.address}: received program: "
+            LOGGER.debug(f"{device.address}: received program: "
                         f"{Program.DAYS[day]}={str(program)}")
 
         elif bytes.startswith(Thermostat.NOTIFY_PROGRAM_CONFIRM):
 
-            LOGGER.info(f"{device.address}: program for "
+            LOGGER.debug(f"{device.address}: program for "
                         f"{Program.DAYS[bytes[2]]} has been successful")
 
     async def read_gatt_char(self, characteristic) -> bytearray:
@@ -130,19 +131,19 @@ class Thermostat(BleakClient, Listener):
 
         if response:
             LOGGER.debug("<<< %s: %s" %
-                         (self.address, MyLogger.hexstr(response)))
+                         (self.address, logManager.logger.hexstr(response)))
 
         return response
 
     async def write_gatt_char(self, characteristic, data, response):
 
         LOGGER.debug(">>> %s: write_gatt_char(%s, %s)" %
-                     (self.address, characteristic, MyLogger.hexstr(data)))
+                     (self.address, characteristic, logManager.logger.hexstr(data)))
         response = await super().write_gatt_char(characteristic, data=data, response=response)
 
         if response:
             LOGGER.debug("<<< %s: %s" %
-                         (self.address, MyLogger.hexstr(response)))
+                         (self.address, logManager.logger.hexstr(response)))
 
         return response
 
@@ -166,13 +167,13 @@ class Thermostat(BleakClient, Listener):
                 try:
                     await self.start_notify(
                         Thermostat.CHARACTERISTIC_NOTIFICATION_HANDLE, callback=_notificationHandler)
-                    LOGGER.info(f"{self.address}: successfully connected and notifications enabled")
+                    LOGGER.debug(f"{self.address}: successfully connected and notifications enabled")
                 except Exception as e:
                     LOGGER.warning(f"{self.address}: failed to enable notifications for characteristic {Thermostat.CHARACTERISTIC_NOTIFICATION_HANDLE}: {e}")
-                    LOGGER.info(f"{self.address}: successfully connected (no notifications)")
+                    LOGGER.debug(f"{self.address}: successfully connected (no notifications)")
             else:
                 LOGGER.warning(f"{self.address}: notification not supported for characteristic {Thermostat.CHARACTERISTIC_NOTIFICATION_HANDLE}, skipping start_notify")
-                LOGGER.info(f"{self.address}: successfully connected (no notifications)")
+                LOGGER.debug(f"{self.address}: successfully connected (no notifications)")
         else:
             raise EqivaException(f"{self.address}: Connection failed")
 
@@ -180,7 +181,7 @@ class Thermostat(BleakClient, Listener):
 
         LOGGER.debug(f"{self.address}: disconnecting...")
         await super().disconnect()
-        LOGGER.info(f"{self.address}: successfully disconnected")
+        LOGGER.debug(f"{self.address}: successfully disconnected")
 
     async def setTemperature(self, temperature: Temperature):
 
@@ -235,7 +236,7 @@ class Thermostat(BleakClient, Listener):
 
     async def requestStatus(self):
 
-        LOGGER.info(f"{self.address}: sync time and request status")
+        LOGGER.debug(f"{self.address}: sync time and request status")
         now = datetime.now()
         bytes = list(Thermostat.COMMAND_STATUS)
         bytes.extend([now.year % 100, now.month, now.day,
@@ -256,7 +257,7 @@ class Thermostat(BleakClient, Listener):
 
     async def requestProgram(self, day: int):
 
-        LOGGER.info(f"{self.address}: request program for "
+        LOGGER.debug(f"{self.address}: request program for "
                     f"{str(Program.DAYS[day])}")
 
         requests = list()

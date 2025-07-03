@@ -1,0 +1,15 @@
+[Unit]
+Description=Eqiva Thermostat Service
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/Eqiva-Smart-Radiator-Thermostat
+ExecStart=python3 /home/pi/Eqiva-Smart-Radiator-Thermostat/api.py
+Restart=on-failure
+Environment=LOG_LEVEL=INFO
+EnvironmentFile=-/home/pi/Eqiva-Smart-Radiator-Thermostat/eq3.env
+
+[Install]
+WantedBy=multi-user.target

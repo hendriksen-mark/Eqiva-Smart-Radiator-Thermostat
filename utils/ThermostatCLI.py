@@ -8,7 +8,6 @@ from bleak import BleakError
 #from bleak.backends.device import BLEDevice
 from bleak.backends.scanner import BLEDevice
 
-from utils.MyLogger import MyLogger
 from utils.Thermostat import Thermostat
 from utils.Event import Event
 from utils.Listener import Listener
@@ -23,7 +22,9 @@ from utils.ThermostatController import ThermostatController
 
 _MAX_BLE_CONNECTIONS = 8
 
-LOGGER = MyLogger()
+import logManager
+
+LOGGER = logManager.logger.get_logger(__name__)
 
 class ThermostatCLI():
 
@@ -186,8 +187,7 @@ class ThermostatCLI():
 
             argv.pop(0)
             if "--log" in sys.argv:
-                MyLogger.level = MyLogger.LEVELS[sys.argv[sys.argv.index("--log") + 1]]
-                LOGGER.level = MyLogger.level
+                logManager.logger.configure_logger(sys.argv[sys.argv.index("--log") + 1])
                 
             if "--macos-use-bdaddr" in sys.argv:
                 ThermostatController.use_bdaddr = True

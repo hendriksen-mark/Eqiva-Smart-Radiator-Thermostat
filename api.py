@@ -1,5 +1,3 @@
-import logging
-from turtle import st
 from flask import Flask, request, jsonify
 import asyncio
 from time import sleep, localtime, strftime
@@ -14,6 +12,9 @@ from threading import Lock, Thread
 import signal
 import subprocess
 from functools import wraps
+import logManager
+
+logging = logManager.logger.get_logger(__name__)
 
 try:
     import Adafruit_DHT  # type: ignore
@@ -48,12 +49,6 @@ class Config:
     # DHT logging thresholds
     DHT_TEMP_CHANGE_THRESHOLD = 0.5  # Only log when temperature changes by more than 0.5°C
     DHT_HUMIDITY_CHANGE_THRESHOLD = 2.0  # Only log when humidity changes by more than 2%
-
-# Update logging configuration
-logging.basicConfig(
-    level=getattr(logging, Config.LOG_LEVEL),
-    format='%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(message)s'
-)
 
 class ThermostatStatus:
     """Data class for thermostat status"""
@@ -598,6 +593,30 @@ def api_documentation() -> Any:
             "/all": {
                 "method": "GET",
                 "description": "Get all system status"
+            },
+            "/config/log-level": {
+                "method": "GET",
+                "description": "Get current log level",
+                "response": {
+                    "current_log_level": "STRING",
+                    "available_levels": "ARRAY"
+                }
+            },
+            "/config/log-level": {
+                "method": "POST",
+                "description": "Set log level via JSON body",
+                "body": {
+                    "log_level": "STRING (DEBUG|INFO|WARNING|ERROR|CRITICAL)"
+                },
+                "example": "POST /config/log-level with {\"log_level\": \"DEBUG\"}"
+            },
+            "/config/log-level/{level}": {
+                "method": "GET",
+                "description": "Set log level via URL parameter",
+                "parameters": {
+                    "level": "STRING (DEBUG|INFO|WARNING|ERROR|CRITICAL)"
+                },
+                "example": "/config/log-level/DEBUG"
             }
         },
         "mac_format": "MAC address can use either : or - as separator (e.g., 00:1A:22:16:3D:E7 or 00-1A-22-16-3D-E7)",
@@ -623,6 +642,102 @@ def log_response_info(response):
 def handle_options(path=None):
     """Handle CORS preflight requests"""
     return '', 200
+
+def update_log_level(log_level: str) -> Dict[str, Any]:
+    """
+    Update log level configuration and persist to environment file
+    Returns response dictionary for API endpoints
+    """
+    log_level = log_level.upper()
+    valid_levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
+    
+    if log_level not in valid_levels:
+        return {
+            "error": f"Invalid log level: {log_level}",
+            "valid_levels": valid_levels,
+            "status_code": 400
+        }
+    
+    try:
+        # Update the logger configuration
+        logManager.logger.configure_logger(log_level)
+        
+        # Update the environment file to persist the change
+        update_env_file('LOG_LEVEL', log_level)
+        
+        logging.info(f"Log level changed to {log_level}")
+        return {
+            "success": True,
+            "message": f"Log level changed to {log_level}",
+            "new_log_level": log_level,
+            "status_code": 200
+        }
+        
+    except Exception as e:
+        logging.error(f"Error changing log level: {e}")
+        return {
+            "error": f"Failed to change log level: {str(e)}",
+            "status_code": 500
+        }
+
+# Log level management endpoints
+@app.route('/config/log-level', methods=['GET'])
+def get_log_level() -> Any:
+    """Get current log level"""
+    current_level = logManager.logger.get_level_name()
+    return jsonify({
+        "current_log_level": current_level,
+        "available_levels": ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+    }), 200
+
+@app.route('/config/log-level', methods=['POST'])
+def set_log_level() -> Any:
+    """
+    Set log level dynamically
+    Body: {"log_level": "DEBUG|INFO|WARNING|ERROR|CRITICAL"}
+    """
+    data = request.get_json()
+    if not data or 'log_level' not in data:
+        return jsonify({"error": "log_level is required in request body"}), 400
+    
+    result = update_log_level(data['log_level'])
+    status_code = result.pop('status_code', 200)
+    return jsonify(result), status_code
+
+@app.route('/config/log-level/<level>', methods=['GET'])
+def set_log_level_simple(level: str) -> Any:
+    """
+    Set log level via URL parameter (simple GET request)
+    URL: /config/log-level/DEBUG
+    """
+    result = update_log_level(level)
+    status_code = result.pop('status_code', 200)
+    return jsonify(result), status_code
+
+def update_env_file(key: str, value: str) -> None:
+    """Update a key-value pair in the environment file"""
+    env_file_path = os.path.join(os.path.dirname(__file__), "eq3.env")
+    
+    # Read current content
+    lines = []
+    if os.path.exists(env_file_path):
+        with open(env_file_path, 'r') as f:
+            lines = f.readlines()
+    
+    # Update or add the key
+    key_found = False
+    for i, line in enumerate(lines):
+        if line.strip().startswith(f"{key}="):
+            lines[i] = f"{key}={value}\n"
+            key_found = True
+            break
+    
+    if not key_found:
+        lines.append(f"{key}={value}\n")
+    
+    # Write back to file
+    with open(env_file_path, 'w') as f:
+        f.writelines(lines)
 
 # Async thermostat operations
 async def set_temperature(mac: str, temp: str) -> Dict[str, Any]:
@@ -774,5 +889,6 @@ def legacy_status_redirect():
 # Backward compatibility: Keep old thermostat routes but mark as deprecated
 
 if __name__ == '__main__':
+    logManager.logger.configure_logger(Config.LOG_LEVEL)
     start_polling()
     app.run(host='0.0.0.0', port=HOST_HTTP_PORT)

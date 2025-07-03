@@ -6,7 +6,6 @@ from bleak import BleakScanner
 from bleak.backends.device import BLEDevice
 from bleak.backends.scanner import AdvertisementData
 
-from utils.MyLogger import MyLogger
 from utils.Thermostat import Thermostat
 from utils.Listener import Listener
 from utils.Program import Program
@@ -15,7 +14,9 @@ from utils.Vacation import Vacation
 from utils.OpenWindowConfig import OpenWindowConfig
 from utils.EqivaException import EqivaException
 
-LOGGER = MyLogger()
+import logManager
+
+LOGGER = logManager.logger.get_logger(__name__)
 
 class ThermostatController():
 

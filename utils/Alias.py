@@ -1,9 +1,9 @@
 import os
 import re
 from utils.Thermostat import Thermostat
-from utils.MyLogger import MyLogger
+import logManager
 
-LOGGER = MyLogger()
+LOGGER = logManager.logger.get_logger(__name__)
 
 class Alias():
 
