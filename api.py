@@ -222,15 +222,7 @@ def get_dht(pin: int = None) -> Any:
     # Handle pin parameter - from URL path or query parameter
     if pin is None:
         pin = request.args.get("pin", type=int)
-    
-    # If pin is provided and different from current, update it
-    if pin is not None and DHT_PIN != pin:
-        logging.info(f"Setting DHT_PIN to {pin}")
-        DHT_PIN = pin
-        # Save the updated configuration
-        save_status_store()
-        # Ensure DHT reading thread is started
-        ensure_dht_thread_running()
+    update_dht_pin(int(pin) if pin else None)
     
     # If no pin is set at all, return default values
     if DHT_PIN is None:
