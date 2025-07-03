@@ -1,18 +1,18 @@
 import logging
+from turtle import st
 from flask import Flask, request, jsonify
 import asyncio
-from time import sleep
+from time import sleep, localtime
 from utils.Thermostat import Thermostat
 from utils.Temperature import Temperature
 from utils.EqivaException import EqivaException
 import yaml
 import os
 from bleak import BleakError
-from typing import Dict, Any, Optional, Union
+from typing import Dict, Any, Optional
 from threading import Lock, Thread
 import signal
 import subprocess
-from dataclasses import dataclass
 from functools import wraps
 
 try:
@@ -153,7 +153,7 @@ def save_status_store() -> None:
         "thermostats": status_store,
         "dht_config": {
             "pin": DHT_PIN,
-            "last_updated": None if DHT_PIN is None else "auto"
+            "last_updated": localtime()
         }
     }
     with open(STATUS_YAML_PATH, "w") as f:
@@ -298,6 +298,8 @@ async def poll_status(mac: str) -> None:
         # Only update and log if the status has changed
         if mac not in status_store or status_store[mac] != new_status:
             status_store[mac] = new_status
+            status_store[mac]["last_updated"] = localtime()
+            save_status_store()
             logging.info(f"Polling: Status changed for {mac}: {status_store[mac]}")
         else:
             logging.debug(f"Polling: No status change for {mac}, skipping update")
@@ -330,7 +332,6 @@ def polling_loop() -> None:
                 if isinstance(result, Exception):
                     logging.error(
                         f"Polling failed for {mac}: {type(result).__name__}: {result}")
-        save_status_store()
         sleep(Config.POLLING_INTERVAL)
 
 def start_polling() -> None:
