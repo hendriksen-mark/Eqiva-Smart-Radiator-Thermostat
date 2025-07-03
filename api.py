@@ -319,9 +319,10 @@ async def poll_status(mac: str) -> None:
             save_status_store()
             logging.info(f"Polling: New thermostat {mac}: {status_store[mac]}")
         else:
-            # Compare only the thermostat data, not the last_updated timestamp
+            # Compare only the thermostat data, not the last_updated timestamp or environmental data
             current_status = {k: v for k, v in status_store[mac].items() if k not in ["last_updated", "currentTemperature", "currentRelativeHumidity"]}
-            if current_status != new_status:
+            new_status_comparable = {k: v for k, v in new_status.items() if k not in ["currentTemperature", "currentRelativeHumidity"]}
+            if current_status != new_status_comparable:
                 status_store[mac] = new_status.copy()
                 status_store[mac]["last_updated"] = strftime("%Y-%m-%d %H:%M:%S", localtime())
                 save_status_store()
