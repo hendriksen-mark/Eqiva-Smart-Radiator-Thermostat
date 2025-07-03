@@ -79,6 +79,9 @@ class DHTService:
                                 abs(rounded_temp - self.last_logged_dht_temp) >= Config.DHT_TEMP_CHANGE_THRESHOLD):
                                 logging.info(f"Updated temperature: {self.latest_temperature}°C")
                                 self.last_logged_dht_temp = rounded_temp
+                        
+                        # Always log current temperature for debugging
+                        logging.debug(f"Temperature: {rounded_temp}°C")
                     else:
                         logging.error("Temperature value not updated (None or out of range)")
                         
@@ -91,6 +94,9 @@ class DHTService:
                                 abs(rounded_humidity - self.last_logged_dht_humidity) >= Config.DHT_HUMIDITY_CHANGE_THRESHOLD):
                                 logging.info(f"Updated humidity: {self.latest_humidity}%")
                                 self.last_logged_dht_humidity = rounded_humidity
+                        
+                        # Always log current humidity for debugging
+                        logging.debug(f"Humidity: {rounded_humidity}%")
                     else:
                         logging.error("Humidity value not updated (None or out of range)")
                         
