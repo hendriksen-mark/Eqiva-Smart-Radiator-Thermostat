@@ -37,6 +37,10 @@ pi.set_PWM_dutycycle(FAN_GPIO_PIN, 0)
 # Flag to prevent double cleanup
 cleanup_done = False
 
+# Variables to track temperature changes for logging
+last_logged_temp = None
+TEMP_CHANGE_THRESHOLD = 0.5  # Only log when temperature changes by more than 0.5°C
+
 def cleanup():
     """Clean up GPIO resources."""
     global cleanup_done
@@ -64,6 +68,7 @@ def renormalize(n, range1, range2):
     return (delta2 * (n - range1[0]) / delta1) + range2[0]
 
 def main():
+    global last_logged_temp
     try:
         while True:
             temp = get_temp()
@@ -71,7 +76,12 @@ def main():
             # Convert temp to pigpio duty cycle (0-255)
             duty_cycle = renormalize(temp, [MIN_TEMP, MAX_TEMP], [MIN_SPEED, MAX_SPEED])
             pi.set_PWM_dutycycle(FAN_GPIO_PIN, duty_cycle)
-            logging.info(f"CPU Temp: {temp:.1f}°C, Fan Duty cycle: {duty_cycle:.1f}")
+            
+            # Only log when temperature changes significantly or this is the first reading
+            if last_logged_temp is None or abs(temp - last_logged_temp) >= TEMP_CHANGE_THRESHOLD:
+                logging.info(f"CPU Temp: {temp:.1f}°C, Fan Duty cycle: {duty_cycle:.1f}")
+                last_logged_temp = temp
+            
             time.sleep(5)
     except KeyboardInterrupt:
         logging.info("\nStopping fan...")

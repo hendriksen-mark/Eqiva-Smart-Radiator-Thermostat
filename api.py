@@ -44,6 +44,10 @@ class Config:
     MAX_DHT_TEMP = 80.0
     MIN_HUMIDITY = 0.0
     MAX_HUMIDITY = 100.0
+    
+    # DHT logging thresholds
+    DHT_TEMP_CHANGE_THRESHOLD = 0.5  # Only log when temperature changes by more than 0.5°C
+    DHT_HUMIDITY_CHANGE_THRESHOLD = 2.0  # Only log when humidity changes by more than 2%
 
 # Update logging configuration
 logging.basicConfig(
@@ -112,6 +116,10 @@ app = Flask(__name__)
 latest_temperature: Optional[float] = None
 latest_humidity: Optional[float] = None
 dht_lock = Lock()
+
+# Variables to track DHT changes for logging
+last_logged_dht_temp: Optional[float] = None
+last_logged_dht_humidity: Optional[float] = None
 
 sensor = Adafruit_DHT.DHT22
 DHT_PIN = None
@@ -186,7 +194,7 @@ def read_dht_temperature() -> None:
     and update the global variables every 5 seconds.
     If the sensor returns invalid values (None or out of range), do not update globals.
     """
-    global latest_temperature, latest_humidity, DHT_PIN
+    global latest_temperature, latest_humidity, DHT_PIN, last_logged_dht_temp, last_logged_dht_humidity
     while DHT_PIN is not None:
         try:
             humidity, temperature = Adafruit_DHT.read_retry(sensor, DHT_PIN)
@@ -194,15 +202,26 @@ def read_dht_temperature() -> None:
             with dht_lock:
                 # Only update if values are valid
                 if temperature is not None and Config.MIN_DHT_TEMP < temperature < Config.MAX_DHT_TEMP:
-                    if latest_temperature is None or latest_temperature != round(float(temperature), 1):
-                        latest_temperature = round(float(temperature), 1)
-                        logging.info(f"Updated temperature: {latest_temperature}")
+                    rounded_temp = round(float(temperature), 1)
+                    if latest_temperature != rounded_temp:
+                        latest_temperature = rounded_temp
+                        # Only log when temperature changes significantly or this is the first reading
+                        if (last_logged_dht_temp is None or 
+                            abs(rounded_temp - last_logged_dht_temp) >= Config.DHT_TEMP_CHANGE_THRESHOLD):
+                            logging.info(f"Updated temperature: {latest_temperature}°C")
+                            last_logged_dht_temp = rounded_temp
                 else:
                     logging.error("Temperature value not updated (None or out of range)")
+                    
                 if humidity is not None and Config.MIN_HUMIDITY <= humidity <= Config.MAX_HUMIDITY:
-                    if latest_humidity is None or latest_humidity != round(float(humidity), 1):
-                        latest_humidity = round(float(humidity), 1)
-                        logging.info(f"Updated humidity: {latest_humidity}")
+                    rounded_humidity = round(float(humidity), 1)
+                    if latest_humidity != rounded_humidity:
+                        latest_humidity = rounded_humidity
+                        # Only log when humidity changes significantly or this is the first reading
+                        if (last_logged_dht_humidity is None or 
+                            abs(rounded_humidity - last_logged_dht_humidity) >= Config.DHT_HUMIDITY_CHANGE_THRESHOLD):
+                            logging.info(f"Updated humidity: {latest_humidity}%")
+                            last_logged_dht_humidity = rounded_humidity
                 else:
                     logging.error("Humidity value not updated (None or out of range)")
         except Exception as e:
