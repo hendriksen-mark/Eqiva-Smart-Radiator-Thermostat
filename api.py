@@ -690,6 +690,15 @@ def internal_error(error):
 
 def cleanup_thermostats():
     logging.info("Cleanup: Disconnecting all thermostats before exit...")
+    
+    # Save current status before cleanup
+    try:
+        logging.info("Cleanup: Saving current status to file...")
+        save_status_store()
+        logging.info("Cleanup: Status saved successfully.")
+    except Exception as e:
+        logging.error(f"Cleanup: Error saving status: {e}")
+    
     with connected_thermostats_lock:
         thermostats = list(connected_thermostats)
     
