@@ -6,7 +6,6 @@ from typing import Any
 import logManager
 
 from ..services import dht_service
-from ..utils import get_pi_temp
 
 logging = logManager.logger.get_logger(__name__)
 
@@ -55,16 +54,3 @@ def get_dht(pin: int | None = None) -> Any:
         "humidity": hum,
         "pin": dht_service.get_pin()
     }), 200
-
-
-@dht_bp.route('/pi_temp', methods=['GET'])
-def read_pi_temperature() -> Any:
-    """
-    Return the Raspberry Pi CPU temperature.
-    """
-    try:
-        temp = get_pi_temp()
-        return jsonify({"temperature": temp}), 200
-    except RuntimeError as e:
-        logging.error(f"Error reading Pi temperature: {e}")
-        return jsonify({"error": "Could not read Pi temperature"}), 503

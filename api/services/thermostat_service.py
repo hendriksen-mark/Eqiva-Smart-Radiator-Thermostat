@@ -1,6 +1,5 @@
 """
-Thermostat service for         self.status_store: dict[str, dict[str, Any]] = {}
-        self.connected_thermostats: set[Thermostat] = set()naging thermostat operations
+Thermostat service for managing thermostat operations
 """
 import asyncio
 import yaml

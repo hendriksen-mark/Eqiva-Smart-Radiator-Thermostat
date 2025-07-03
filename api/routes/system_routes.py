@@ -7,6 +7,7 @@ import logManager
 
 from ..config import Config, update_env_file
 from ..services import thermostat_service, dht_service
+from ..utils import get_pi_temp
 
 logging = logManager.logger.get_logger(__name__)
 
@@ -213,6 +214,18 @@ def set_log_level_simple(level: str) -> Any:
     result = update_log_level(level)
     status_code = result.pop('status_code', 200)
     return jsonify(result), status_code
+
+@system_bp.route('/pi_temp', methods=['GET'])
+def read_pi_temperature() -> Any:
+    """
+    Return the Raspberry Pi CPU temperature.
+    """
+    try:
+        temp = get_pi_temp()
+        return jsonify({"temperature": temp}), 200
+    except RuntimeError as e:
+        logging.error(f"Error reading Pi temperature: {e}")
+        return jsonify({"error": "Could not read Pi temperature"}), 503
 
 
 # Legacy route redirects

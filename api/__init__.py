@@ -8,7 +8,7 @@ from typing import Any
 import logManager
 
 from .config import Config
-from .services import thermostat_service, dht_service
+from .services import thermostat_service
 from .routes import dht_bp, homekit_bp, system_bp
 from .middleware import register_middleware
 

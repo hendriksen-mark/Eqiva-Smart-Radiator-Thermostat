@@ -1,7 +1,7 @@
 """
 Middleware for the Flask application
 """
-from flask import request, g, Flask
+from flask import request, Flask
 import logManager
 
 logging = logManager.logger.get_logger(__name__)
