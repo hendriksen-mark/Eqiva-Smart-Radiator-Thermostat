@@ -47,7 +47,8 @@ def get_dht(pin: int | None = None) -> Any:
             "warning": "DHT sensor data not available"
         }), 200
     
-    logging.debug(f"Returning DHT data: temperature={temp}, humidity={hum}, pin={dht_service.get_pin()}")
+    logging.info(f"Returning DHT data")
+    logging.debug(f"Temperature: {temp}°C, Humidity: {hum}%, Pin: {dht_service.get_pin()}")
     
     return jsonify({
         "temperature": temp,

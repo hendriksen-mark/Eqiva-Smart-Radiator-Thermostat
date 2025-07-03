@@ -42,7 +42,8 @@ def get_homekit_status(mac: str, dht_pin: int) -> Any:
     if status.get("currentRelativeHumidity") is not None:
         response["currentRelativeHumidity"] = status["currentRelativeHumidity"]
     
-    logging.info(f"Returning status for {mac}: {response}")
+    logging.info(f"Returning status for {mac}")
+    logging.debug(f"Status response: {response}")
     return jsonify(response), 200
 
 
