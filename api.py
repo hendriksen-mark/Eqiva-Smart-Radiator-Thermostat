@@ -263,8 +263,10 @@ async def safe_connect(thermostat: Thermostat) -> None:
 async def safe_disconnect(thermostat: Thermostat) -> None:
     try:
         await thermostat.disconnect()
+    except (TimeoutError, asyncio.CancelledError) as e:
+        logging.warning(f"Disconnect timeout/cancelled for {thermostat.address}: {e}")
     except Exception as e:
-        logging.error(f"Error disconnecting from {thermostat.mac}: {e}")
+        logging.error(f"Error disconnecting from {thermostat.address}: {e}")
     with connected_thermostats_lock:
         connected_thermostats.discard(thermostat)
 
@@ -690,14 +692,40 @@ def cleanup_thermostats():
     logging.info("Cleanup: Disconnecting all thermostats before exit...")
     with connected_thermostats_lock:
         thermostats = list(connected_thermostats)
+    
+    if not thermostats:
+        logging.info("Cleanup: No thermostats to disconnect.")
+        return
+    
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    for thermostat in thermostats:
+    
+    async def cleanup_all():
+        tasks = []
+        for thermostat in thermostats:
+            try:
+                # Create a timeout wrapper for each disconnect
+                task = asyncio.wait_for(safe_disconnect(thermostat), timeout=5.0)
+                tasks.append(task)
+            except Exception as e:
+                logging.error(f"Cleanup: Error preparing disconnect for {thermostat.address}: {e}")
+        
+        if tasks:
+            try:
+                await asyncio.gather(*tasks, return_exceptions=True)
+            except Exception as e:
+                logging.error(f"Cleanup: Error during gather: {e}")
+    
+    try:
+        loop.run_until_complete(cleanup_all())
+    except Exception as e:
+        logging.error(f"Cleanup: Error during cleanup: {e}")
+    finally:
         try:
-            loop.run_until_complete(safe_disconnect(thermostat))
+            loop.close()
         except Exception as e:
-            logging.error(f"Cleanup: Error disconnecting from {thermostat.mac}: {e}")
-    loop.close()
+            logging.error(f"Cleanup: Error closing loop: {e}")
+    
     logging.info("Cleanup: All thermostats disconnected.")
 
 def handle_exit(signum, frame):
@@ -708,10 +736,6 @@ def handle_exit(signum, frame):
 signal.signal(signal.SIGTERM, handle_exit)
 signal.signal(signal.SIGINT, handle_exit)
 
-if __name__ == '__main__':
-    start_polling()
-    app.run(host='0.0.0.0', port=HOST_HTTP_PORT)
-
 # Legacy route redirects
 @app.route('/status', methods=['GET'])
 def legacy_status_redirect():
@@ -720,3 +744,7 @@ def legacy_status_redirect():
     return redirect(url_for('get_all_status'))
 
 # Backward compatibility: Keep old thermostat routes but mark as deprecated
+
+if __name__ == '__main__':
+    start_polling()
+    app.run(host='0.0.0.0', port=HOST_HTTP_PORT)
