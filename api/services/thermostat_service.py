@@ -194,7 +194,7 @@ class ThermostatService:
                     if isinstance(result, Exception):
                         logging.error(
                             f"Polling failed for {mac}: {type(result).__name__}: {result}")
-            sleep(Config.POLLING_INTERVAL)
+            sleep(Config.get_current_polling_interval())
     
     def start_polling(self) -> None:
         """Start background polling thread"""

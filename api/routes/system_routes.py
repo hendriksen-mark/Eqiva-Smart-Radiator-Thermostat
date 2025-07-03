@@ -5,7 +5,7 @@ from flask import Blueprint, request, jsonify
 from typing import Any
 import logManager
 
-from ..config import Config, update_env_file
+from ..config import Config, update_env_file, reload_env_variables
 from ..services import thermostat_service, dht_service
 from ..utils import get_pi_temp
 
@@ -115,19 +115,21 @@ def api_documentation() -> Any:
             },
             "/config/log-level": {
                 "method": "POST",
-                "description": "Set log level via JSON body",
+                "description": "Set log level via JSON body. DEBUG mode enables faster polling (30s vs 300s)",
                 "body": {
                     "log_level": "STRING (DEBUG|INFO|WARNING|ERROR|CRITICAL)"
                 },
-                "example": "POST /config/log-level with {\"log_level\": \"DEBUG\"}"
+                "example": "POST /config/log-level with {\"log_level\": \"DEBUG\"}",
+                "note": "Setting DEBUG automatically reduces polling interval to 30 seconds for faster updates"
             },
             "/config/log-level/{level}": {
                 "method": "GET",
-                "description": "Set log level via URL parameter",
+                "description": "Set log level via URL parameter. DEBUG mode enables faster polling (30s vs 300s)",
                 "parameters": {
                     "level": "STRING (DEBUG|INFO|WARNING|ERROR|CRITICAL)"
                 },
-                "example": "/config/log-level/DEBUG"
+                "example": "/config/log-level/DEBUG",
+                "note": "Setting DEBUG automatically reduces polling interval to 30 seconds for faster updates"
             }
         },
         "mac_format": "MAC address can use either : or - as separator (e.g., 00:1A:22:16:3D:E7 or 00-1A-22-16-3D-E7)",
@@ -145,6 +147,7 @@ def handle_options(path: str | None = None) -> Any:
 def update_log_level(log_level: str) -> dict[str, Any]:
     """
     Update log level configuration and persist to environment file
+    Also adjusts polling interval based on debug mode
     Returns response dictionary for API endpoints
     """
     log_level = log_level.upper()
@@ -164,11 +167,27 @@ def update_log_level(log_level: str) -> dict[str, Any]:
         # Update the environment file to persist the change
         update_env_file('LOG_LEVEL', log_level)
         
+        # Adjust polling interval based on debug mode
+        if log_level == 'DEBUG':
+            # Set faster polling for debug mode (30 seconds)
+            polling_interval = 30
+            update_env_file('POLLING_INTERVAL', str(polling_interval))
+            logging.info(f"Debug mode enabled - polling interval set to {polling_interval} seconds")
+        else:
+            # Set normal polling for non-debug modes (5 minutes)
+            polling_interval = 300
+            update_env_file('POLLING_INTERVAL', str(polling_interval))
+            logging.info(f"Normal mode - polling interval set to {polling_interval} seconds")
+        
+        # Reload environment variables to make changes take effect immediately
+        reload_env_variables()
+        
         logging.info(f"Log level changed to {log_level}")
         return {
             "success": True,
-            "message": f"Log level changed to {log_level}",
+            "message": f"Log level changed to {log_level}, polling interval set to {polling_interval} seconds",
             "new_log_level": log_level,
+            "polling_interval": polling_interval,
             "status_code": 200
         }
         
