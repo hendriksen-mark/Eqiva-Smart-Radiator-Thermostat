@@ -30,6 +30,7 @@ class ThermostatService:
         self.connected_thermostats_lock = Lock()
         self.status_yaml_path = Config.STATUS_YAML_PATH
         self._polling_started = False
+        self.failed_connections: set[str] = set()  # Track MACs that have failed connections
     
     def load_status_store(self) -> None:
         """Load status store from YAML file"""
@@ -114,6 +115,12 @@ class ThermostatService:
         thermostat = Thermostat(mac)
         try:
             await self.safe_connect(thermostat)
+            
+            # Check if this MAC was previously failing and log recovery
+            if mac in self.failed_connections:
+                self.failed_connections.remove(mac)
+                logging.info(f"Connection recovered for {mac}")
+            
             logging.debug(f"Polling: Connected to {mac}")
             await thermostat.requestStatus()
             logging.debug(f"Polling: Status requested from {mac}")
@@ -156,9 +163,11 @@ class ThermostatService:
                 else:
                     logging.debug(f"Polling: No status change for {mac}, skipping update")
         except BleakError as e:
+            self.failed_connections.add(mac)  # Track this MAC as failed
             logging.error(f"Polling: BLE error for {mac}: {e}")
             raise
         except EqivaException as e:
+            self.failed_connections.add(mac)  # Track this MAC as failed
             logging.error(f"Polling: EqivaException for {mac}: {e}")
             pass
         finally:
