@@ -72,6 +72,7 @@ class DHTService:
                     # Only update if values are valid
                     if temperature is not None and Config.MIN_DHT_TEMP < temperature < Config.MAX_DHT_TEMP:
                         rounded_temp = round(float(temperature), 1)
+                        logged_info = False
                         if self.latest_temperature != rounded_temp:
                             self.latest_temperature = rounded_temp
                             # Only log when temperature changes significantly or this is the first reading
@@ -79,14 +80,17 @@ class DHTService:
                                 abs(rounded_temp - self.last_logged_dht_temp) >= Config.DHT_TEMP_CHANGE_THRESHOLD):
                                 logging.info(f"Updated temperature: {self.latest_temperature}°C")
                                 self.last_logged_dht_temp = rounded_temp
+                                logged_info = True
                         
-                        # Always log current temperature for debugging
-                        logging.debug(f"Temperature: {rounded_temp}°C")
+                        # Always log current temperature for debugging (unless we just logged at info level)
+                        if not logged_info:
+                            logging.debug(f"Temperature: {rounded_temp}°C")
                     else:
                         logging.error("Temperature value not updated (None or out of range)")
                         
                     if humidity is not None and Config.MIN_HUMIDITY <= humidity <= Config.MAX_HUMIDITY:
                         rounded_humidity = round(float(humidity), 1)
+                        logged_info = False
                         if self.latest_humidity != rounded_humidity:
                             self.latest_humidity = rounded_humidity
                             # Only log when humidity changes significantly or this is the first reading
@@ -94,9 +98,11 @@ class DHTService:
                                 abs(rounded_humidity - self.last_logged_dht_humidity) >= Config.DHT_HUMIDITY_CHANGE_THRESHOLD):
                                 logging.info(f"Updated humidity: {self.latest_humidity}%")
                                 self.last_logged_dht_humidity = rounded_humidity
+                                logged_info = True
                         
-                        # Always log current humidity for debugging
-                        logging.debug(f"Humidity: {rounded_humidity}%")
+                        # Always log current humidity for debugging (unless we just logged at info level)
+                        if not logged_info:
+                            logging.debug(f"Humidity: {rounded_humidity}%")
                     else:
                         logging.error("Humidity value not updated (None or out of range)")
                         
