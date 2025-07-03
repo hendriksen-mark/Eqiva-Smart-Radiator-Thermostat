@@ -141,7 +141,7 @@ def load_status_store() -> None:
                 dht_config = data.get("dht_config", {})
                 if "pin" in dht_config and dht_config["pin"] is not None:
                     DHT_PIN = int(dht_config["pin"])
-                    logging.info(f"Loaded DHT_PIN from config: {DHT_PIN}")
+                    logging.debug(f"Loaded DHT_PIN from config: {DHT_PIN}")
                 else:
                     DHT_PIN = None
             else:
@@ -311,14 +311,23 @@ async def poll_status(mac: str) -> None:
             "currentRelativeHumidity": current_hum
         }
         
-        # Only update and log if the status has changed
-        if mac not in status_store or status_store[mac] != new_status:
-            status_store[mac] = new_status
+        # Only update and log if the status has changed (excluding last_updated field)
+        if mac not in status_store:
+            # First time seeing this MAC
+            status_store[mac] = new_status.copy()
             status_store[mac]["last_updated"] = strftime("%Y-%m-%d %H:%M:%S", localtime())
             save_status_store()
-            logging.info(f"Polling: Status changed for {mac}: {status_store[mac]}")
+            logging.info(f"Polling: New thermostat {mac}: {status_store[mac]}")
         else:
-            logging.debug(f"Polling: No status change for {mac}, skipping update")
+            # Compare only the thermostat data, not the last_updated timestamp
+            current_status = {k: v for k, v in status_store[mac].items() if k != "last_updated"}
+            if current_status != new_status:
+                status_store[mac] = new_status.copy()
+                status_store[mac]["last_updated"] = strftime("%Y-%m-%d %H:%M:%S", localtime())
+                save_status_store()
+                logging.info(f"Polling: Status changed for {mac}: {status_store[mac]}")
+            else:
+                logging.debug(f"Polling: No status change for {mac}, skipping update")
     except BleakError as e:
         logging.error(f"Polling: BLE error for {mac}: {e}")
         raise
@@ -364,7 +373,6 @@ def start_polling() -> None:
     # Start DHT thread if pin is configured in the loaded config
     if DHT_PIN is not None:
         ensure_dht_thread_running()
-        logging.info(f"DHT sensor configured on pin {DHT_PIN} - starting reading thread")
 
 def update_dht_pin(dht_pin: Optional[int]) -> None:
     """Update DHT pin if provided and ensure DHT reading is active"""
@@ -889,6 +897,8 @@ def legacy_status_redirect():
 # Backward compatibility: Keep old thermostat routes but mark as deprecated
 
 if __name__ == '__main__':
+    logging.info("Starting Eqiva Smart Radiator Thermostat API...")
+    logging.info(f"Current log level: {Config.LOG_LEVEL}")
     logManager.logger.configure_logger(Config.LOG_LEVEL)
     start_polling()
     app.run(host='0.0.0.0', port=HOST_HTTP_PORT)
