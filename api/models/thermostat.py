@@ -37,14 +37,23 @@ def create_default_thermostat_status() -> dict[str, Any]:
 
 
 def calculate_heating_cooling_state(mode: dict[str, Any], valve: int = None) -> int:
-    """Calculate the current heating/cooling state based on mode and valve position"""
-    if 'OFF' in mode:
+    """
+    Calculate the current heating/cooling state based on mode and valve position
+    Possible return values:
+    0 - Off
+    1 - Heating
+    2 - Cooling (not used in this context)
+    """
+    if 'OFF' in mode or (valve is not None and valve <= 0):
         return 0  # Off
-    elif valve and valve > 0 and 'MANUAL' in mode:
+    elif valve and valve > 0:
         return 1  # Heating
-    elif valve == 0 and 'MANUAL' in mode:
-        return 2  # Not actively heating but in manual mode
-    elif 'AUTO' in mode:
-        return 3  # Auto mode
     else:
-        return 1  # Default to heating for manual mode
+        # Default to off if no specific conditions are met
+        return 0
+    #elif valve == 0 and 'MANUAL' in mode:
+    #    return 2  # Not actively heating but in manual mode
+    #elif 'AUTO' in mode:
+    #    return 3  # Auto mode
+    #else:
+    #    return 1  # Default to heating for manual mode
