@@ -202,8 +202,8 @@ class ThermostatService:
         if not self._polling_started:
             Thread(target=self._polling_loop, daemon=True).start()
             self._polling_started = True
-            logging.info("Started thermostat polling thread")
-    
+            logging.info(f"Started thermostat polling thread with {len(self.status_store)} thermostats")
+
     async def set_temperature(self, mac: str, temp: str) -> dict[str, Any]:
         """Set thermostat target temperature"""
         thermostat = Thermostat(mac)
