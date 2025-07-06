@@ -32,7 +32,7 @@ def create_app() -> Flask:
 
 def handle_exit(signum: int, frame: Any) -> None:
     """Handle exit signals"""
-    logging.info("Received signal {}, shutting down gracefully...".format(signum))
+    logging.info(f"Received signal {signum} on {frame}, shutting down gracefully...")
     thermostat_service.cleanup_thermostats()
     os._exit(0)
 
@@ -46,7 +46,7 @@ def setup_signal_handlers() -> None:
 def initialize_services() -> None:
     """Initialize all services"""
     logging.info("Starting Eqiva Smart Radiator Thermostat API...")
-    logging.info("Current log level: {}".format(Config.LOG_LEVEL))
+    logging.info(f"Current log level: {Config.LOG_LEVEL}")
     logManager.logger.configure_logger(Config.LOG_LEVEL)
     thermostat_service.start_polling()
 
