@@ -16,7 +16,6 @@ import logManager
 
 from ..config import Config
 from ..models import calculate_heating_cooling_state, create_default_thermostat_status
-from .dht_service import dht_service
 
 logging = logManager.logger.get_logger(__name__)
 
@@ -32,6 +31,10 @@ class ThermostatService:
         self._polling_started = False
         self.failed_connections: set[str] = set()  # Track MACs that have failed connections
     
+    def _get_dht_service(self):
+        from .dht_service import dht_service
+        return dht_service
+    
     def load_status_store(self) -> None:
         """Load status store from YAML file"""
         if os.path.exists(self.status_yaml_path):
@@ -43,7 +46,7 @@ class ThermostatService:
                     # Load DHT pin configuration
                     dht_config = data.get("dht_config", {})
                     if "pin" in dht_config and dht_config["pin"] is not None:
-                        dht_service.set_pin(int(dht_config["pin"]))
+                        self._get_dht_service().set_pin(int(dht_config["pin"]))
                         logging.debug(f"Loaded DHT_PIN from config: {dht_config['pin']}")
                 else:
                     self.status_store = {}
@@ -55,7 +58,7 @@ class ThermostatService:
         data = {
             "thermostats": self.status_store,
             "dht_config": {
-                "pin": dht_service.get_pin(),
+                "pin": self._get_dht_service().get_pin(),
                 "last_updated": strftime("%Y-%m-%d %H:%M:%S", localtime())
             }
         }
@@ -89,15 +92,15 @@ class ThermostatService:
     
     def get_all_status(self) -> dict[str, Any]:
         """Get all thermostat status and system information"""
-        temp, humidity = dht_service.get_data()
+        temp, humidity = self._get_dht_service().get_data()
         
         message = {
             "thermostats": self.status_store,
             "dht": {
-                "pin": dht_service.get_pin(),
+                "pin": self._get_dht_service().get_pin(),
                 "temperature": temp,
                 "humidity": humidity,
-                "active": dht_service.get_pin() is not None
+                "active": self._get_dht_service().get_pin() is not None
             }
         }
         
@@ -145,7 +148,7 @@ class ThermostatService:
             valve = thermostat.valve
             temp = thermostat.temperature.valueC
 
-            current_temp, current_hum = dht_service.get_data()
+            current_temp, current_hum = self._get_dht_service().get_data()
             if current_temp is None:
                 current_temp = temp
             if current_hum is None:
