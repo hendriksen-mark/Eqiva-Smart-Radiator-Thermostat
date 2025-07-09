@@ -61,7 +61,24 @@ class ThermostatService:
         }
         with open(self.status_yaml_path, "w") as f:
             yaml.safe_dump(data, f)
-    
+
+    def update_dht_related_status(self, **kwargs) -> None:
+        """Update DHT-related status for all MAC addresses"""
+        if not self.status_store:
+            return
+
+        current_temp = kwargs.get('temperature')
+        current_hum = kwargs.get('humidity')
+
+        for mac in self.status_store:
+            thermostat_status = self.status_store[mac]
+            if current_temp is not None:
+                thermostat_status["currentTemperature"] = current_temp
+            if current_hum is not None:
+                thermostat_status["currentRelativeHumidity"] = current_hum
+
+        logging.debug(f"Updated DHT status for {len(self.status_store)} thermostats: temp={current_temp}°C, humidity={current_hum}%")
+
     def get_status(self, mac: str) -> dict[str, Any]:
         """Get thermostat status for a given MAC address"""
         if mac not in self.status_store:

@@ -3,6 +3,7 @@ DHT sensor service for temperature and humidity monitoring
 """
 from time import sleep
 from threading import Lock, Thread
+from api.services import thermostat_service
 import logManager
 
 from ..config import Config
@@ -80,6 +81,7 @@ class DHTService:
                                 abs(rounded_temp - self.last_logged_dht_temp) >= Config.DHT_TEMP_CHANGE_THRESHOLD):
                                 logging.info(f"Updated temperature: {self.latest_temperature}°C")
                                 self.last_logged_dht_temp = rounded_temp
+                                thermostat_service.update_dht_related_status(temperature=rounded_temp)
                                 logged_info = True
                         
                         # Always log current temperature for debugging (unless we just logged at info level)
@@ -98,6 +100,7 @@ class DHTService:
                                 abs(rounded_humidity - self.last_logged_dht_humidity) >= Config.DHT_HUMIDITY_CHANGE_THRESHOLD):
                                 logging.info(f"Updated humidity: {self.latest_humidity}%")
                                 self.last_logged_dht_humidity = rounded_humidity
+                                thermostat_service.update_dht_related_status(humidity=rounded_humidity)
                                 logged_info = True
                         
                         # Always log current humidity for debugging (unless we just logged at info level)
