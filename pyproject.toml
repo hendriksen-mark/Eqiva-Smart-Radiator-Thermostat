@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "eqiva-smart-radiator-thermostat"
+version = "1.0.0"
+description = "Python library and CLI for controlling Eqiva Smart Radiator Thermostat via Bluetooth LE"
+authors = [
+    {name = "Mark Hendriksen"}
+]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Topic :: Home Automation",
+    "Topic :: System :: Hardware",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "bleak",
+    "logManager @ git+https://github.com/hendriksen-mark/logManager.git"
+]
+
+[project.urls]
+Homepage = "https://github.com/hendriksen-mark/Eqiva-Smart-Radiator-Thermostat"
+Repository = "https://github.com/hendriksen-mark/Eqiva-Smart-Radiator-Thermostat"
+Issues = "https://github.com/hendriksen-mark/Eqiva-Smart-Radiator-Thermostat/issues"
+
+[project.scripts]
+eqiva = "eqiva_thermostat:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["eqiva_thermostat*"]
+exclude = ["eqiva_thermostat.utils.__pycache__*"]

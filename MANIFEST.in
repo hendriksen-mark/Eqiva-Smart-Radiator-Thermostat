@@ -1,0 +1,11 @@
+include README.md
+include LICENSE
+include requirements.txt
+include eqiva.py
+recursive-include eqiva_thermostat *.py
+exclude eqiva_thermostat/utils/__pycache__
+exclude __pycache__
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude *~
+global-exclude *.orig
