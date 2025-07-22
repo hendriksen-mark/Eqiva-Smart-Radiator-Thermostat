@@ -1,0 +1,137 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on version tags like v1.0.2
+
+permissions:
+  contents: write
+
+jobs:
+  build-package:
+    name: Build Package
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Ensure all tags are fetched
+      
+    - name: Determine latest tag
+      id: determine_latest_tag
+      run: |
+        if [[ "${{ github.event_name }}" == "push" ]]; then
+          echo "latest_tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+        else
+          latest_tag=$(git describe --tags `git rev-list --tags --max-count=1`)
+          echo "latest_tag=$latest_tag" >> $GITHUB_OUTPUT
+        fi
+      env:
+        GITHUB_REF_NAME: ${{ github.ref_name }}
+      
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+        
+    - name: Install build dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build
+        
+    - name: Build package
+      run: python -m build
+      
+    - name: Share artifact inside workflow
+      uses: actions/upload-artifact@v4
+      with:
+        name: eqiva-thermostat-dist
+        path: dist/
+        
+    outputs:
+      latest_tag: ${{ steps.determine_latest_tag.outputs.latest_tag }}
+
+  release-package:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: build-package
+    
+    steps:
+    - name: Download artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: eqiva-thermostat-dist
+        
+    - name: Test artifact download
+      run: ls -la
+      
+    - name: Create and Upload Release
+      id: create_release
+      uses: softprops/action-gh-release@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ needs.build-package.outputs.latest_tag }}
+        name: Eqiva Smart Radiator Thermostat ${{ needs.build-package.outputs.latest_tag }}
+        body: |
+          ## Eqiva Smart Radiator Thermostat ${{ needs.build-package.outputs.latest_tag }}
+          
+          ### 📦 Installation
+          
+          Install directly from GitHub:
+          ```bash
+          pip install git+https://github.com/hendriksen-mark/Eqiva-Smart-Radiator-Thermostat.git@${{ needs.build-package.outputs.latest_tag }}
+          ```
+          
+          Or add to your `requirements.txt`:
+          ```
+          eqiva-smart-radiator-thermostat @ git+https://github.com/hendriksen-mark/Eqiva-Smart-Radiator-Thermostat.git@${{ needs.build-package.outputs.latest_tag }}
+          ```
+          
+          ### 🚀 Usage Examples
+          
+          Command line interface:
+          ```bash
+          # Set temperature to 21.5°C
+          eqiva <mac_address> --temp 21.5
+          
+          # Get thermostat status
+          eqiva <mac_address> --status
+          
+          # Set boost mode
+          eqiva <mac_address> --boost on
+          ```
+          
+          Python API:
+          ```python
+          from eqiva_thermostat import Thermostat
+          
+          # Connect to thermostat
+          thermostat = Thermostat(mac_address="XX:XX:XX:XX:XX:XX")
+          
+          # Set temperature
+          thermostat.set_temperature(21.5)
+          ```
+          
+          ### 🔄 What's Changed
+          - Modern Python packaging with pyproject.toml
+          - Full-featured CLI and Python API
+          - Bluetooth LE support via bleak
+          - Cross-platform compatibility (Linux, Windows, macOS)
+          - Support for Python 3.8+
+          
+          ### 📋 Features
+          - Complete thermostat control (temperature, mode, boost, vacation)
+          - Programming support (weekly schedules)
+          - Offset temperature adjustment
+          - Comfort/eco temperature settings
+          - Open window detection configuration
+          - Status monitoring and synchronization
+          - Alias support for easy device management
+          
+        files: |
+          *.tar.gz
+          *.whl
+        make_latest: true

@@ -1,0 +1,83 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12', '3.13']
+        exclude:
+          # Exclude Python 3.8 on macOS (deprecated on GitHub Actions)
+          - os: macos-latest
+            python-version: '3.8'
+        
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build pytest
+        
+    - name: Install package
+      run: |
+        pip install -e .
+        
+    - name: Test package installation
+      run: |
+        python -c "import eqiva_thermostat; print('eqiva_thermostat package imported successfully')"
+        python -c "from eqiva_thermostat import Thermostat, ThermostatController; print('Core classes imported successfully')"
+        
+    - name: Test CLI entry point
+      run: |
+        python -c "from eqiva_thermostat import main; print('CLI entry point available')"
+        
+    - name: Run basic functionality tests
+      run: |
+        python -c "
+        from eqiva_thermostat import Temperature, Mode
+        temp = Temperature(21.5)
+        print(f'Temperature object created: {temp}')
+        mode = Mode.AUTO
+        print(f'Mode enum available: {mode}')
+        print('Basic functionality test completed successfully')
+        "
+        
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+        
+    - name: Install build dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build
+        
+    - name: Build package
+      run: |
+        python -m build
+      
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: eqiva-thermostat-dist
+        path: dist/
