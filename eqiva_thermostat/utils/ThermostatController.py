@@ -6,13 +6,13 @@ from bleak import BleakScanner
 from bleak.backends.device import BLEDevice
 from bleak.backends.scanner import AdvertisementData
 
-from utils.Thermostat import Thermostat
-from utils.Listener import Listener
-from utils.Program import Program
-from utils.Temperature import Temperature
-from utils.Vacation import Vacation
-from utils.OpenWindowConfig import OpenWindowConfig
-from utils.EqivaException import EqivaException
+from .Thermostat import Thermostat
+from .Listener import Listener
+from .Program import Program
+from .Temperature import Temperature
+from .Vacation import Vacation
+from .OpenWindowConfig import OpenWindowConfig
+from .EqivaException import EqivaException
 
 import logManager
 

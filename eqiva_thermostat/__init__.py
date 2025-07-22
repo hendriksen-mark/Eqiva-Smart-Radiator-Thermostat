@@ -20,7 +20,7 @@ def main():
     """Main entry point for the eqiva CLI."""
     ThermostatCLI()
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 __author__ = "Mark Hendriksen"
 
 __all__ = [

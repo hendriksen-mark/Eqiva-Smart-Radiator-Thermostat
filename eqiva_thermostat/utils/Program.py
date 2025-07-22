@@ -1,5 +1,5 @@
-from utils.Event import Event
-from utils.EqivaException import EqivaException
+from .Event import Event
+from .EqivaException import EqivaException
 
 class Program():
 

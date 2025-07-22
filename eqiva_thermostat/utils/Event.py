@@ -1,5 +1,5 @@
-from utils.Temperature import Temperature
-from utils.EqivaException import EqivaException
+from .Temperature import Temperature
+from .EqivaException import EqivaException
 
 class Event():
 

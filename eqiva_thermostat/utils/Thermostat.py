@@ -2,13 +2,13 @@ from datetime import datetime
 import asyncio
 from bleak import BleakClient
 
-from utils.Listener import Listener
-from utils.Program import Program
-from utils.Temperature import Temperature
-from utils.Vacation import Vacation
-from utils.Mode import Mode
-from utils.OpenWindowConfig import OpenWindowConfig
-from utils.EqivaException import EqivaException
+from .Listener import Listener
+from .Program import Program
+from .Temperature import Temperature
+from .Vacation import Vacation
+from .Mode import Mode
+from .OpenWindowConfig import OpenWindowConfig
+from .EqivaException import EqivaException
 
 import logManager
 

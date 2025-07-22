@@ -1,6 +1,6 @@
 import os
 import re
-from utils.Thermostat import Thermostat
+from .Thermostat import Thermostat
 import logManager
 
 LOGGER = logManager.logger.get_logger(__name__)

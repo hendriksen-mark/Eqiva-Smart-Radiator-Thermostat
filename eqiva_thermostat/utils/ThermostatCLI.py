@@ -8,17 +8,17 @@ from bleak import BleakError
 #from bleak.backends.device import BLEDevice
 from bleak.backends.scanner import BLEDevice
 
-from utils.Thermostat import Thermostat
-from utils.Event import Event
-from utils.Listener import Listener
-from utils.Program import Program
-from utils.Temperature import Temperature
-from utils.Vacation import Vacation
-from utils.Mode import Mode
-from utils.OpenWindowConfig import OpenWindowConfig
-from utils.EqivaException import EqivaException
-from utils.Alias import Alias
-from utils.ThermostatController import ThermostatController
+from .Thermostat import Thermostat
+from .Event import Event
+from .Listener import Listener
+from .Program import Program
+from .Temperature import Temperature
+from .Vacation import Vacation
+from .Mode import Mode
+from .OpenWindowConfig import OpenWindowConfig
+from .EqivaException import EqivaException
+from .Alias import Alias
+from .ThermostatController import ThermostatController
 
 _MAX_BLE_CONNECTIONS = 8
 
