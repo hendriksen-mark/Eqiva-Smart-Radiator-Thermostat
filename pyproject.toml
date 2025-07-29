@@ -7,6 +7,9 @@ name = "eqiva-smart-radiator-thermostat"
 version = "1.0.2"
 description = "Python library and CLI for controlling Eqiva Smart Radiator Thermostat via Bluetooth LE"
 authors = [
+    {name = "Heckie"}
+]
+maintainers = [
     {name = "Mark Hendriksen"}
 ]
 license = {text = "MIT"}
@@ -33,9 +36,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/hendriksen-mark/Eqiva-Smart-Radiator-Thermostat"
-Repository = "https://github.com/hendriksen-mark/Eqiva-Smart-Radiator-Thermostat"
-Issues = "https://github.com/hendriksen-mark/Eqiva-Smart-Radiator-Thermostat/issues"
+Homepage = "https://github.com/Heckie75/Eqiva-Smart-Radiator-Thermostat"
+Repository = "https://github.com/Heckie75/Eqiva-Smart-Radiator-Thermostat"
+Issues = "https://github.com/Heckie75/Eqiva-Smart-Radiator-Thermostat/issues"
 
 [project.scripts]
 eqiva = "eqiva_thermostat:main"

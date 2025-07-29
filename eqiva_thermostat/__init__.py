@@ -4,16 +4,21 @@ A Python library and CLI for controlling Eqiva Smart Radiator Thermostat via Blu
 """
 
 from .utils import (
-    Thermostat,
-    ThermostatController,
-    ThermostatCLI,
-    Temperature,
-    Mode,
-    Program,
-    Vacation,
-    OpenWindowConfig,
     Alias,
-    EqivaException
+    EqivaException,
+    Event,
+    Listener,
+    Mode,
+    MyLogger,
+    OpenWindowConfig,
+    Program,
+    scan,
+    service_explorer,
+    Temperature,
+    Thermostat,
+    ThermostatCLI,
+    ThermostatController,
+    Vacation,
 )
 
 def main():
@@ -21,18 +26,24 @@ def main():
     ThermostatCLI()
 
 __version__ = "1.0.2"
-__author__ = "Mark Hendriksen"
+__author__ = "Heckie"
+__maintainer__ = "Mark Hendriksen"
 
 __all__ = [
-    'Thermostat',
-    'ThermostatController',
-    'ThermostatCLI', 
-    'Temperature',
-    'Mode',
-    'Program',
-    'Vacation',
-    'OpenWindowConfig',
     'Alias',
     'EqivaException',
-    'main'
+    'Event',
+    'Listener',
+    'main',
+    'Mode',
+    'MyLogger',
+    'OpenWindowConfig',
+    'Program',
+    'scan',
+    'service_explorer',
+    'Temperature',
+    'Thermostat',
+    'ThermostatCLI',
+    'ThermostatController',
+    'Vacation'
 ]

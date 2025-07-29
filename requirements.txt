@@ -1,2 +1,0 @@
-bleak
-logManager @ git+https://github.com/hendriksen-mark/logManager.git
