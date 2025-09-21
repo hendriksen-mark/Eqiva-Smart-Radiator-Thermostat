@@ -3,7 +3,7 @@ import asyncio
 from datetime import datetime, timedelta
 
 from eqiva_thermostat import (EqivaException, Event, OpenWindowConfig, Program,
-                                    Temperature, Thermostat, Vacation)
+                              Temperature, Thermostat, Vacation)
 
 
 async def do_stuff() -> None:
