@@ -83,6 +83,11 @@ Agent registered
 [CHG] Controller 14:F6:D8:D4:1F:F1 Pairable: yes
 [bluetooth]# select  00:1A:7D:DA:71:13
 Controller 00:1A:7D:DA:71:13 my-pc [default]
+[bluetooth]# scan on
+Discovery started
+[NEW] Device 00:1A:22:0A:91:CF CC-RT-BLE
+[bluetooth]# scan off
+Discovery stopped
 [bluetooth]# connect 00:1A:22:0A:91:CF
 Attempting to connect to 00:1A:22:0A:91:CF
 [CHG] Device 00:1A:22:0A:91:CF Connected: yes
@@ -95,6 +100,36 @@ Request passkey
         /org/bluez/hci1/dev_00_1A_22_0A_91_CF/service0200
         00001801-0000-1000-8000-00805f9b34fb
         Generic Attribute Profile
+...
+[CC-RT-BLE]# disconnect
+[CC-RT-BLE]# quit
+```
+Example with pair:
+```
+$ bluetoothctl
+Agent registered
+[CHG] Controller 00:1A:7D:DA:71:13 Pairable: yes
+[CHG] Controller 14:F6:D8:D4:1F:F1 Pairable: yes
+[bluetooth]# select  00:1A:7D:DA:71:13
+Controller 00:1A:7D:DA:71:13 my-pc [default]
+[bluetooth]# scan on
+Discovery started
+[NEW] Device 00:1A:22:0A:91:CF CC-RT-BLE
+[bluetooth]# scan off
+Discovery stopped
+[bluetooth]# connect 00:1A:22:0A:91:CF
+Attempting to connect to 00:1A:22:0A:91:CF
+[CHG] Device 00:1A:22:0A:91:CF Connected: yes
+[CHG] Device 00:1A:22:0A:91:CF Connected: no
+Connection successful
+[bluetooth]# pair 00:1A:22:0A:91:CF
+Attempting to pair with 00:1A:22:0A:91:CF
+[CHG] Device 00:1A:22:0A:91:CF Connected: yes
+Request passkey
+[agent] Enter passkey (number in 0-999999): xxxxxx
+[CHG] Device 00:1A:22:0A:91:CF Bonded: yes
+[CHG] Device 00:1A:22:0A:91:CF Paired: yes
+Pairing successful
 ...
 [CC-RT-BLE]# disconnect
 [CC-RT-BLE]# quit
