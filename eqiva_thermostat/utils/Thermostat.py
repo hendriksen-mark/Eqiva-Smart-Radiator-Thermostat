@@ -55,8 +55,14 @@ class Thermostat(BleakClient, Listener):
     def __init__(self, address: str) -> None:
 
         super().__init__(address, timeout=30.0)
+        self._name = None
+    @property
+    def name(self) -> str:
+        return self._name
 
-        self.name: str = None
+    @name.setter
+    def name(self, value: str) -> None:
+        self._name = value
         self.vendor: str = None
         self.serialNumber: str = None
         self.firmware: float = None
