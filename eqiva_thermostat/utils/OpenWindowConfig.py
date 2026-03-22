@@ -1,16 +1,17 @@
+from typing import Optional
 from .Temperature import Temperature
 from .EqivaException import EqivaException
 
 class OpenWindowConfig():
 
-    def __init__(self, temperature: Temperature = None, minutes: int = 0):
+    def __init__(self, temperature: Optional[Temperature] = None, minutes: int = 0):
 
         if minutes < 0 or minutes > 995 or minutes % 5 != 0:
             raise EqivaException(
                 message='minutes must be between 5 and 995 in steps of 5')
 
         self.minutes: int = minutes
-        self.temperature: Temperature = temperature
+        self.temperature: Optional[Temperature] = temperature
 
     @staticmethod
     def fromBytes(bytes: bytearray) -> 'OpenWindowConfig':
@@ -22,12 +23,15 @@ class OpenWindowConfig():
 
     def toBytes(self) -> bytearray:
 
+        if self.temperature is None:
+            raise EqivaException(message='temperature must be set')
+
         return bytearray([self.temperature.toByte(), self.minutes // 5])
 
     def to_dict(self) -> dict:
 
         return {
-            "temperature": self.temperature.to_dict(),
+            "temperature": self.temperature.to_dict() if self.temperature is not None else None,
             "minutes": self.minutes
         }
 

@@ -1,10 +1,11 @@
 from datetime import datetime, timedelta
+from typing import Optional
 
 class Vacation():
 
-    def __init__(self, until: datetime = None):
+    def __init__(self, until: Optional[datetime] = None):
 
-        self.until: datetime = (
+        self.until: Optional[datetime] = (
             until - timedelta(minutes=until.minute % 30)) if until else None
 
     @staticmethod
@@ -17,6 +18,9 @@ class Vacation():
         return v
 
     def toBytes(self) -> bytearray:
+
+        if self.until is None:
+            raise ValueError("Vacation 'until' is not set")
 
         return bytearray([self.until.day, self.until.year - 2000, self.until.hour * 2 + self.until.minute // 30, self.until.month])
 

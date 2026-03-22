@@ -52,7 +52,7 @@ class Program():
 
         return bytearray(bytes)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> list:
 
         return [e.to_dict() for e in self.events if e.hour != 0]
 

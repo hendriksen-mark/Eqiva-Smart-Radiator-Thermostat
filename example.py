@@ -38,9 +38,9 @@ async def do_stuff() -> None:
 
         # set programs
         events = [
-            Event(temperature=Temperature(valueC=5.0), hour=6, minute=40),
-            Event(temperature=Temperature(valueC=20.5), hour=7, minute=40),
-            Event(temperature=Temperature(valueC=5.0), hour=24, minute=0)
+            Event.Event(temperature=Temperature(valueC=5.0), hour=6, minute=40),
+            Event.Event(temperature=Temperature(valueC=20.5), hour=7, minute=40),
+            Event.Event(temperature=Temperature(valueC=5.0), hour=24, minute=0)
         ]
         await thermostat.setProgram(day=Program.DAY_MONDAY, program=Program(events=events))
 

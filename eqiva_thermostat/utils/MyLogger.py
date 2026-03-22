@@ -1,4 +1,5 @@
 import sys
+from typing import Optional
 
 class MyLogger():
     LEVELS = {
@@ -12,7 +13,7 @@ class MyLogger():
 
     level = LEVELS["INFO"]  # Class variable for global log level
 
-    def __init__(self, level: int = None) -> None:
+    def __init__(self, level: Optional[int] = None) -> None:
         if level is not None:
             MyLogger.level = level  # Set global log level if provided
 

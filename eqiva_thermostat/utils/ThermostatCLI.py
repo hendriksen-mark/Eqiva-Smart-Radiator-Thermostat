@@ -4,9 +4,9 @@ import re
 import sys
 from datetime import datetime, timedelta
 
-from bleak import BleakError
-#from bleak.backends.device import BLEDevice
-from bleak.backends.scanner import BLEDevice
+from bleak.exc import BleakError
+from bleak.backends.device import BLEDevice
+#from bleak.backends.scanner import BLEDevice
 
 from .Thermostat import Thermostat
 from .Event import Event
@@ -213,7 +213,7 @@ class ThermostatCLI():
                         _MAX_BLE_CONNECTIONS, len(addresses)))
                 elif addresses and commands:
                     asyncio.run(self.process(
-                        addresses=addresses, commands=commands))
+                        addresses=list(addresses), commands=commands))
                 elif not addresses:
                     raise EqivaException(
                         message="Mac address or alias unknown")
@@ -228,7 +228,7 @@ class ThermostatCLI():
         except KeyboardInterrupt:
             pass
 
-    def _build_help(self, command=None, header=False, msg="") -> None:
+    def _build_help(self, command=None, header=False, msg="") -> str:
 
         s = ""
 
@@ -331,7 +331,7 @@ USAGE:   eqiva.py <mac_1/alias_1> [<mac_2/alias_2>] ... --<command_1> [<param_1>
             else:
                 return ", ".join([m.lower().replace("_", " ") for m in modes])
 
-        def temp_to_human_readable(temp: Temperature) -> str:
+        def temp_to_human_readable(temp: 'Temperature | None') -> str:
 
             if not temp:
                 return "n/a"
@@ -342,7 +342,7 @@ USAGE:   eqiva.py <mac_1/alias_1> [<mac_2/alias_2>] ... --<command_1> [<param_1>
             else:
                 return f"{temp.valueC:.1f}°C ({temp.fahrenheit():.1f}°F)"
 
-        def vacation_to_human_readable(vacation: Vacation, temperature: Temperature) -> str:
+        def vacation_to_human_readable(vacation: 'Vacation | None', temperature: 'Temperature | None') -> str:
 
             if vacation and vacation.until:
                 if command_style:
@@ -352,7 +352,7 @@ USAGE:   eqiva.py <mac_1/alias_1> [<mac_2/alias_2>] ... --<command_1> [<param_1>
             else:
                 return "" if command_style else "off"
 
-        def openwindow_to_human_readable(openwindowconfig: OpenWindowConfig) -> str:
+        def openwindow_to_human_readable(openwindowconfig: 'OpenWindowConfig | None') -> str:
 
             if not openwindowconfig:
                 return "n/a"
@@ -371,7 +371,10 @@ USAGE:   eqiva.py <mac_1/alias_1> [<mac_2/alias_2>] ... --<command_1> [<param_1>
             else:
                 return f"{temp_to_human_readable(event.temperature)} until {event.hour:02}:{event.minute:02}"
 
-        def program_to_human_readable(program: Program) -> str:
+        def program_to_human_readable(program: Program | None) -> str:
+
+            if not program:
+                return ""
 
             if command_style:
                 return " ".join([event_to_human_readable(event=e) for e in program.events if e.hour != 0])
@@ -416,7 +419,7 @@ USAGE:   eqiva.py <mac_1/alias_1> [<mac_2/alias_2>] ... --<command_1> [<param_1>
                 s.append(mode_to_human_readable(thermostat.mode))
                 s.append(" --temp %s" %
                          temp_to_human_readable(thermostat.temperature))
-                if thermostat.vacation.until:
+                if thermostat.vacation and thermostat.vacation.until:
                     s.append(" --vacation %s" % vacation_to_human_readable(
                         thermostat.vacation, temperature=thermostat.temperature))
                 s.append(" --comforteco %s %s" % (
@@ -521,18 +524,27 @@ USAGE:   eqiva.py <mac_1/alias_1> [<mac_2/alias_2>] ... --<command_1> [<param_1>
                         await asyncio.gather(controller.requestProgram(day=Program.DAYS.index(command[ThermostatCLI._PARAMS][0])))
 
                     else:
-                        events = list()  # type: ignore
-                        temp = None
-                        for i, param in enumerate(command[ThermostatCLI._PARAMS][1:]):
+                        events: 'list[Event]' = list()
+                        temp: 'Temperature | None' = None
+                        program_params = command[ThermostatCLI._PARAMS][1:]
+                        for i, param in enumerate(program_params):
                             if i % 2:
+                                if temp is None:
+                                    raise EqivaException(
+                                        message="Invalid program definition")
                                 hour, minute = tuple(param.split(":"))
                                 events.append(
                                     Event(temperature=temp, hour=int(hour), minute=int(minute)))
                             else:
                                 temp = Temperature(valueC=float(param))
 
+                        if temp is None:
+                            raise EqivaException(
+                                message="Invalid program definition")
+
+                        final_temperature = events[0].temperature if len(program_params) % 2 == 0 else temp
                         events.append(
-                            Event(temperature=events[0].temperature if i % 2 else temp, hour=24, minute=0))
+                            Event(temperature=final_temperature, hour=24, minute=0))
 
                         await asyncio.gather(controller.setProgram(day=Program.DAYS.index(command[ThermostatCLI._PARAMS][0]), program=Program(events=events)))
 
@@ -635,7 +647,7 @@ USAGE:   eqiva.py <mac_1/alias_1> [<mac_2/alias_2>] ... --<command_1> [<param_1>
     def parse_args(self, argv: 'list[str]') -> 'tuple[set[str], list[dict]]':
 
         addresses: 'set[str]' = set()
-        commands: 'list[tuple[str, list[str]]]' = list()
+        commands: 'list[dict]' = list()
 
         cmd_group = False
         for arg in argv:

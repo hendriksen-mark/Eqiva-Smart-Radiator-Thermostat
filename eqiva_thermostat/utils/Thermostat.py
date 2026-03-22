@@ -1,6 +1,7 @@
 from datetime import datetime
 import asyncio
 from bleak import BleakClient
+from bleak.backends.device import BLEDevice
 
 from .Listener import Listener
 from .Program import Program
@@ -55,30 +56,31 @@ class Thermostat(BleakClient, Listener):
     def __init__(self, address: str) -> None:
 
         super().__init__(address, timeout=30.0)
-        self._name = None
+        self._deviceName: str | None = None
     @property
-    def name(self) -> str:
-        return self._name
+    def deviceName(self) -> str | None:
+        return self._deviceName
 
-    @name.setter
-    def name(self, value: str) -> None:
-        self._name = value
-        self.vendor: str = None
-        self.serialNumber: str = None
-        self.firmware: float = None
-        self.mode: Mode = None
-        self.temperature: Temperature = None
-        self.valve: int = None
-        self.vacation: Vacation = None
-        self.programs: list = [None] * 7
-        self.ecoTemperature: Temperature = None
-        self.comfortTemperature: Temperature = None
-        self.openWindowConfig: OpenWindowConfig = None
-        self.offsetTemperature: Temperature = None
+    @deviceName.setter
+    def deviceName(self, value: str) -> None:
+        self._deviceName = value
+        self.vendor: str | None = None
+        self.serialNumber: str | None = None
+        self.firmware: float | None = None
+        self.mode: Mode | None = None
+        self.temperature: Temperature | None = None
+        self.valve: int | None = None
+        self.vacation: Vacation | None = None
+        self.programs: list[Program | None] = [None] * 7
+        self.ecoTemperature: Temperature | None = None
+        self.comfortTemperature: Temperature | None = None
+        self.openWindowConfig: OpenWindowConfig | None = None
+        self.offsetTemperature: Temperature | None = None
 
-    def onNotify(self, device, bytes):
+    def onNotify(self, device: BLEDevice | None, bytes: bytearray):
 
-        LOGGER.debug(f"<<< {device.address}: received notification("
+        source_address = device.address if device else self.address
+        LOGGER.debug(f"<<< {source_address}: received notification("
                      f"{logManager.logger.hexstr(bytes)})")
 
         if bytes.startswith(Thermostat.NOTIFY_SERIAL):
@@ -86,7 +88,7 @@ class Thermostat(BleakClient, Listener):
             self.serialNumber = bytearray(
                 [b - 0x30 for b in bytes[4:-1]]).decode()
             self.firmware = bytes[1] / 100
-            LOGGER.debug(f"{device.address}: received serialNo and firmware version: "
+            LOGGER.debug(f"{source_address}: received serialNo and firmware version: "
                         f"{self.serialNumber}, {self.firmware}")
 
         elif bytes.startswith(Thermostat.NOTIFY_STATUS):
@@ -111,9 +113,9 @@ class Thermostat(BleakClient, Listener):
                 self.ecoTemperature = None
                 self.offsetTemperature = None
                 LOGGER.debug(
-                    f"{device.address}: outdated firmware detected.")
+                    f"{source_address}: outdated firmware detected.")
 
-            LOGGER.debug(f"{device.address}: received status: mode={str(self.mode)}, temperature={str(self.temperature)}, valve={str(self.valve)}%, vacation={str(self.vacation)}, openWindowConfig="
+            LOGGER.debug(f"{source_address}: received status: mode={str(self.mode)}, temperature={str(self.temperature)}, valve={str(self.valve)}%, vacation={str(self.vacation)}, openWindowConfig="
                         f"{str(self.openWindowConfig)}, comfortTemperature={str(self.comfortTemperature)}, ecoTemperature={str(self.ecoTemperature)}, offsetTemperature={str(self.offsetTemperature)}")
 
         elif bytes.startswith(Thermostat.NOTIFY_PROGRAM_REQUEST):
@@ -121,12 +123,12 @@ class Thermostat(BleakClient, Listener):
             day = bytes[1]
             program = Program.fromBytes(bytes=bytes[2:])
             self.programs[day] = program
-            LOGGER.debug(f"{device.address}: received program: "
+            LOGGER.debug(f"{source_address}: received program: "
                         f"{Program.DAYS[day]}={str(program)}")
 
         elif bytes.startswith(Thermostat.NOTIFY_PROGRAM_CONFIRM):
 
-            LOGGER.debug(f"{device.address}: program for "
+            LOGGER.debug(f"{source_address}: program for "
                         f"{Program.DAYS[bytes[2]]} has been successful")
 
     async def read_gatt_char(self, characteristic) -> bytearray:
@@ -159,7 +161,7 @@ class Thermostat(BleakClient, Listener):
 
         async def _notificationHandler(c, bytes: bytearray) -> None:
 
-            _self.onNotify(device=_self, bytes=bytes)
+            _self.onNotify(device=None, bytes=bytes)
 
         LOGGER.debug(f"{self.address}: connecting...")
 
@@ -296,7 +298,7 @@ class Thermostat(BleakClient, Listener):
 
         await asyncio.sleep(Thermostat.WAIT_NOTIFICATION)
 
-    async def setProgram(self, day: int, program: Program) -> 'list[Thermostat]':
+    async def setProgram(self, day: int, program: Program) -> None:
 
         LOGGER.info(f"{self.address}: set "
                     f"{str(program)} on {Program.DAYS[day]}")
@@ -363,23 +365,25 @@ class Thermostat(BleakClient, Listener):
 
         LOGGER.info(f"{self.address}: request name")
         name = await self.read_gatt_char(Thermostat.CHARACTERISTIC_DEVICE_NAME_STRING)
-        self.name = name.decode()
-        LOGGER.info(f"{self.address}: name is {self.name}")
-        return self.name
+        decoded_name = name.decode()
+        self.deviceName = decoded_name
+        LOGGER.info(f"{self.address}: name is {self.deviceName}")
+        return decoded_name
 
     async def requestVendor(self) -> str:
 
         LOGGER.info(f"{self.address}: request vendor")
         vendor = await self.read_gatt_char(Thermostat.CHARACTERISTIC_VENDOR_STRING)
-        self.vendor = vendor.decode()
-        LOGGER.info(f"{self.address}: name is {self.vendor}")
-        return self.vendor
+        decoded_vendor = vendor.decode()
+        self.vendor = decoded_vendor
+        LOGGER.info(f"{self.address}: vendor is {self.vendor}")
+        return decoded_vendor
 
     def to_dict(self) -> dict:
 
         return {
             "mac": self.address,
-            "name": self.name,
+            "name": self.deviceName,
             "vendor": self.vendor,
             "serialNumber": self.serialNumber,
             "firmware": self.firmware,
@@ -398,4 +402,4 @@ class Thermostat(BleakClient, Listener):
 
         programs = ", ".join(
             [f"{Program.DAYS[d]}={str(p)}" for d, p in enumerate(self.programs) if p])
-        return f"Thermostat(address={self.address}, name={self.name}, vendor={self.vendor}, serialNo={self.serialNumber}, firmware={self.firmware}, mode={str(self.mode)}, temperature={str(self.temperature)}, valve={str(self.valve)}%, vacation={str(self.vacation)}, programs=Programs({programs}), openWindowConfig={str(self.openWindowConfig)}, comfortTemperature={str(self.comfortTemperature)}, ecoTemperature={str(self.ecoTemperature)}, offsetTemperature={str(self.offsetTemperature)})"
+        return f"Thermostat(address={self.address}, name={self.deviceName}, vendor={self.vendor}, serialNo={self.serialNumber}, firmware={self.firmware}, mode={str(self.mode)}, temperature={str(self.temperature)}, valve={str(self.valve)}%, vacation={str(self.vacation)}, programs=Programs({programs}), openWindowConfig={str(self.openWindowConfig)}, comfortTemperature={str(self.comfortTemperature)}, ecoTemperature={str(self.ecoTemperature)}, offsetTemperature={str(self.offsetTemperature)})"

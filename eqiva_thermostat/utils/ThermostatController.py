@@ -1,6 +1,7 @@
 import asyncio
 import time
 from datetime import datetime, timedelta
+from typing import Optional
 
 from bleak import BleakScanner
 from bleak.backends.device import BLEDevice
@@ -38,7 +39,7 @@ class ThermostatController():
             raise EqivaException(
                 message="Could not find all given addresses")
         else:
-            self.thermostats = [Thermostat(device) for device in devices]
+            self.thermostats = [Thermostat(device.address) for device in devices]
 
         coros = [thermostat.connect() for thermostat in self.thermostats]
         await asyncio.gather(*coros)
@@ -112,7 +113,7 @@ class ThermostatController():
         await asyncio.gather(*coros)
         return self.thermostats
 
-    async def setVacation(self, temperature: Temperature, datetime_: datetime = None, time_: timedelta = None, hours: int = 0) -> 'list':
+    async def setVacation(self, temperature: Temperature, datetime_: Optional[datetime] = None, time_: Optional[timedelta] = None, hours: int = 0) -> 'list':
 
         if datetime_:
             vacation = Vacation(until=datetime_)
@@ -168,7 +169,7 @@ class ThermostatController():
         await asyncio.gather(*coros)
         return self.thermostats
 
-    async def reset(self) -> None:
+    async def reset(self) -> 'list':
 
         coros = [thermostat.reset()
                  for thermostat in self.thermostats if thermostat.is_connected]
@@ -207,12 +208,12 @@ class ThermostatController():
 
         return self.thermostats
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> 'list[dict]':
 
         return [t.to_dict() for t in self.thermostats]
 
     @staticmethod
-    async def scan(duration: int = 20, filter_: 'list[str]' = None, listener: 'Listener' = None) -> 'set[BLEDevice]':
+    async def scan(duration: int = 20, filter_: Optional[list[str]] = None, listener: Optional[Listener] = None) -> set[BLEDevice]:
 
         found_devices: 'set[BLEDevice]' = set()
         found_bulbs: 'set[BLEDevice]' = set()

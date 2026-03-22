@@ -1,5 +1,6 @@
 import os
 import re
+from typing import Optional
 from .Thermostat import Thermostat
 import logManager
 
@@ -30,12 +31,12 @@ class Alias():
         except:
             pass
 
-    def resolve(self, label: str) -> 'set[str]':
+    def resolve(self, label: str) -> 'Optional[set[str]]':
 
         if re.match(Alias.MAC_PATTERN, label.upper()):
             label = label.upper()
             if label.upper().startswith(Thermostat.MAC_PREFIX) or label.upper().endswith(Thermostat.MAC_PREFIX):
-                return [label]
+                return {label}
             else:
                 return None
         else:

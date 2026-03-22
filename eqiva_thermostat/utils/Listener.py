@@ -1,4 +1,4 @@
-from bleak.backends.scanner import BLEDevice
+from bleak.backends.device import BLEDevice
 
 class Listener():
 

@@ -1,9 +1,10 @@
+from typing import Optional
 from .Temperature import Temperature
 from .EqivaException import EqivaException
 
 class Event():
 
-    def __init__(self, temperature: Temperature = None, hour: int = 0, minute: int = 0):
+    def __init__(self, temperature: Optional[Temperature] = None, hour: int = 0, minute: int = 0):
 
         if hour < 0 or hour > 24 or minute < 0 or minute > 50 or minute % 10 != 0:
             raise EqivaException(
@@ -11,7 +12,7 @@ class Event():
 
         self.hour = hour
         self.minute = minute
-        self.temperature: Temperature = temperature
+        self.temperature: Optional[Temperature] = temperature
 
     @staticmethod
     def fromBytes(bytes: bytearray) -> 'Event':
@@ -23,12 +24,18 @@ class Event():
 
     def toBytes(self) -> bytearray:
 
+        if self.temperature is None:
+            raise EqivaException('temperature must be set before calling toBytes')
         return bytearray([self.temperature.toByte(), self.hour * 6 + self.minute // 10])
 
     def to_dict(self) -> dict:
 
+        temperature = self.temperature
+        if temperature is None:
+            raise EqivaException('temperature must be set before calling to_dict')
+
         return {
-            "temperature": self.temperature.to_dict(),
+            "temperature": temperature.to_dict(),
             "until": f"{self.hour:02}:{self.minute:02}"
         }
 
