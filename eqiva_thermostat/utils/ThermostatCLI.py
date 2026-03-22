@@ -3,6 +3,7 @@ import json
 import re
 import sys
 from datetime import datetime, timedelta
+from typing import Optional
 
 from bleak.exc import BleakError
 from bleak.backends.device import BLEDevice
@@ -371,7 +372,7 @@ USAGE:   eqiva.py <mac_1/alias_1> [<mac_2/alias_2>] ... --<command_1> [<param_1>
             else:
                 return f"{temp_to_human_readable(event.temperature)} until {event.hour:02}:{event.minute:02}"
 
-        def program_to_human_readable(program: Program | None) -> str:
+        def program_to_human_readable(program: Optional[Program]) -> str:
 
             if not program:
                 return ""

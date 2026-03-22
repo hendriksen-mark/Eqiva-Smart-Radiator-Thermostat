@@ -1,7 +1,7 @@
 import asyncio
 import time
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import List, Optional, Set
 
 from bleak import BleakScanner
 from bleak.backends.device import BLEDevice
@@ -213,7 +213,7 @@ class ThermostatController():
         return [t.to_dict() for t in self.thermostats]
 
     @staticmethod
-    async def scan(duration: int = 20, filter_: Optional[list[str]] = None, listener: Optional[Listener] = None) -> set[BLEDevice]:
+    async def scan(duration: int = 20, filter_: Optional[List[str]] = None, listener: Optional[Listener] = None) -> Set[BLEDevice]:
 
         found_devices: 'set[BLEDevice]' = set()
         found_bulbs: 'set[BLEDevice]' = set()

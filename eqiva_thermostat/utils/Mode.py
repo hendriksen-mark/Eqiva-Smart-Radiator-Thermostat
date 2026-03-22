@@ -1,3 +1,5 @@
+from typing import List
+
 class Mode():
 
     AUTO = 0x00
@@ -17,9 +19,9 @@ class Mode():
 
         self.mode = mode
 
-    def to_dict(self) -> list[str]:
+    def to_dict(self) -> List[str]:
 
-        modes: list[str] = [Mode.MODES[0]
+        modes: List[str] = [Mode.MODES[0]
                             ] if self.mode & Mode.MANUAL != Mode.MANUAL else []
         modes.extend([m for i, m in enumerate(
             Mode.MODES[1:]) if self.mode & 2**i == 2**i])

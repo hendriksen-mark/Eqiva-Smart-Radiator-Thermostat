@@ -1,5 +1,6 @@
 from datetime import datetime
 import asyncio
+from typing import List, Optional
 from bleak import BleakClient
 from bleak.backends.device import BLEDevice
 
@@ -56,28 +57,28 @@ class Thermostat(BleakClient, Listener):
     def __init__(self, address: str) -> None:
 
         super().__init__(address, timeout=30.0)
-        self._deviceName: str | None = None
+        self._deviceName: Optional[str] = None
     @property
-    def deviceName(self) -> str | None:
+    def deviceName(self) -> Optional[str]:
         return self._deviceName
 
     @deviceName.setter
     def deviceName(self, value: str) -> None:
         self._deviceName = value
-        self.vendor: str | None = None
-        self.serialNumber: str | None = None
-        self.firmware: float | None = None
-        self.mode: Mode | None = None
-        self.temperature: Temperature | None = None
-        self.valve: int | None = None
-        self.vacation: Vacation | None = None
-        self.programs: list[Program | None] = [None] * 7
-        self.ecoTemperature: Temperature | None = None
-        self.comfortTemperature: Temperature | None = None
-        self.openWindowConfig: OpenWindowConfig | None = None
-        self.offsetTemperature: Temperature | None = None
+        self.vendor: Optional[str] = None
+        self.serialNumber: Optional[str] = None
+        self.firmware: Optional[float] = None
+        self.mode: Optional[Mode] = None
+        self.temperature: Optional[Temperature] = None
+        self.valve: Optional[int] = None
+        self.vacation: Optional[Vacation] = None
+        self.programs: List[Optional[Program]] = [None] * 7
+        self.ecoTemperature: Optional[Temperature] = None
+        self.comfortTemperature: Optional[Temperature] = None
+        self.openWindowConfig: Optional[OpenWindowConfig] = None
+        self.offsetTemperature: Optional[Temperature] = None
 
-    def onNotify(self, device: BLEDevice | None, bytes: bytearray):
+    def onNotify(self, device: Optional[BLEDevice], bytes: bytearray):
 
         source_address = device.address if device else self.address
         LOGGER.debug(f"<<< {source_address}: received notification("
