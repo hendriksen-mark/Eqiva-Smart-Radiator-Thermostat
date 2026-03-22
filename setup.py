@@ -10,7 +10,7 @@ def read_readme():
 
 setup(
     name="eqiva-smart-radiator-thermostat",
-    version="1.0.3",
+    version="1.0.4",
     author="Heckie",
     maintainer="Mark Hendriksen",
     description="Python library and CLI for controlling Eqiva Smart Radiator Thermostat via Bluetooth LE",
